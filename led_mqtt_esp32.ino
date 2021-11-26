@@ -17,12 +17,26 @@ const char* mqtt_server = "192.168.50.10";
 // LED Pin
 const int ledPin = 26;
 
+//Soil moisture Pin (analog pin)
+const int siol_moisture_pin = 34;
+
+//Photoresistor Pin (analog pin)
+const int photoresistor_pin = 35;
+
 // Board id
 const char* board_id = "1";
 
 // topics to subscribe
 const int subscriptions = 1;
 char *subscribe_to[subscriptions] = {"led"};
+
+//Moisture values
+const int dry_soil_moisture_value = 2500;
+const int wet_soil_moisture_value = 1200;
+
+//Photoresistor values
+const int low_value = 3000;
+const int high_value = 500;
 
 WiFiClient espClient;
 PubSubClient client(espClient);
@@ -36,6 +50,9 @@ void setup() {
   client.setCallback(callback);
 
   pinMode(ledPin, OUTPUT);
+  pinMode(siol_moisture_pin, INPUT);
+  pinMode(siol_moisture_pin, INPUT);
+  
 }
 
 void setup_wifi() {
@@ -82,6 +99,7 @@ void publish_msg(char* local_topic, char* msg){
   client.publish(topic, msg);
 }
 
+
 void handle_led(String msg){
   Serial.print("Changing output to ");
   Serial.println(msg);
@@ -91,6 +109,42 @@ void handle_led(String msg){
   else if(msg == "false"){
     digitalWrite(ledPin, LOW);
   }
+}
+
+void handle_soil_moisture_sensor(){
+  int soil_moisture = analogRead(siol_moisture_pin);
+  int soil_moisture_percentage = map(soil_moisture, wet_soil_moisture_value, dry_soil_moisture_value, 100, 0);
+  
+  //Serial.print(soil_moisture_percentage);// DEBUG
+  //Serial.println("%");// DEBUG
+  
+  String soil_moisture_percentage_str = String(soil_moisture_percentage);
+  int str_len = soil_moisture_percentage_str.length() + 1; 
+  char char_array[str_len];
+  soil_moisture_percentage_str.toCharArray(char_array, str_len);
+  
+  //publish to mqtt server
+  publish_msg("soil_moisture", char_array);
+
+}
+
+void handle_photoresistor_sensor(){
+  int photoresistor = analogRead(photoresistor_pin);
+  
+  //Serial.println(photoresistor);// DEBUG
+  int photoresistor_percentage = map(photoresistor, high_value, low_value, 100, 0);
+  
+  //Serial.print(soil_moisture_percentage);// DEBUG
+  //Serial.println("%");// DEBUG
+  
+  String photoresistor_percentage_str = String(photoresistor_percentage);
+  int str_len = photoresistor_percentage_str.length() + 1; 
+  char char_array[str_len];
+  photoresistor_percentage_str.toCharArray(char_array, str_len);
+  
+  //publish to mqtt server
+  publish_msg("photoresistor", char_array);
+
 }
 
 void callback(char* topic, byte* message, unsigned int length) {
@@ -136,4 +190,6 @@ void loop() {
     reconnect();
   }
   client.loop();
+  handle_soil_moisture_sensor();
+  handle_photoresistor_sensor();
 }

@@ -3,6 +3,10 @@
   Complete project details at https://randomnerdtutorials.com  
 *********/
 
+uint64_t uS_TO_S_FACTOR = 1000000;  /* Conversion factor for micro seconds to seconds */
+uint64_t TIME_TO_SLEEP = 10;        /* Time ESP32 will go to sleep (in seconds) */
+
+
 #include <WiFi.h>
 #include <PubSubClient.h>
 #include <Wire.h>
@@ -27,8 +31,8 @@ const int photoresistor_pin = 35;
 const char* board_id = "1";
 
 // topics to subscribe
-const int subscriptions = 1;
-char *subscribe_to[subscriptions] = {"led"};
+const int subscriptions = 2;
+char *subscribe_to[subscriptions] = {"led", "irigation"};
 
 //Moisture values
 const int dry_soil_moisture_value = 2500;
@@ -41,19 +45,6 @@ const int high_value = 500;
 WiFiClient espClient;
 PubSubClient client(espClient);
 
-
-
-void setup() {
-  Serial.begin(115200);
-  setup_wifi();
-  client.setServer(mqtt_server, 1883);
-  client.setCallback(callback);
-
-  pinMode(ledPin, OUTPUT);
-  pinMode(siol_moisture_pin, INPUT);
-  pinMode(siol_moisture_pin, INPUT);
-  
-}
 
 void setup_wifi() {
   delay(10);
@@ -147,6 +138,17 @@ void handle_photoresistor_sensor(){
 
 }
 
+void handle_irigation(String msg){
+  if(msg == "true"){
+    Serial.println("irigation started");
+    digitalWrite(ledPin, HIGH);
+    delay(3000);
+    digitalWrite(ledPin, LOW);
+    publish_msg("irigationoff", "false");
+    Serial.println("irigation ended");
+  }
+}
+
 void callback(char* topic, byte* message, unsigned int length) {
   // print what topic and message have arrived to serial
   Serial.print("Message arrived on topic: ");
@@ -164,6 +166,7 @@ void callback(char* topic, byte* message, unsigned int length) {
   topic = &topic[8];
   String local_topic = String(topic);
   if (local_topic == "led") handle_led(messageTemp);
+  if (local_topic == "irigation") handle_irigation(messageTemp);
   
 }
 
@@ -185,11 +188,32 @@ void reconnect() {
     }
   }
 }
+
 void loop() {
+  
+}
+
+void setup() {
+  Serial.begin(115200);
+  setup_wifi();
+  client.setServer(mqtt_server, 1883);
+  client.setCallback(callback);
+
+  pinMode(ledPin, OUTPUT);
+  pinMode(siol_moisture_pin, INPUT);
+  pinMode(siol_moisture_pin, INPUT);
+  Serial.println("woke up");
+
   if (!client.connected()) {
     reconnect();
   }
-  client.loop();
+
   handle_soil_moisture_sensor();
   handle_photoresistor_sensor();
+  for(int i = 0; i < 10; i++){
+  client.loop(); //Ensure we've sent & received everything
+  delay(100);
+  }
+  Serial.println("going to sleep");
+  ESP.deepSleep(TIME_TO_SLEEP * uS_TO_S_FACTOR);
 }

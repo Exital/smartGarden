@@ -1,15 +1,17 @@
 /*********
-  Rui Santos
-  Complete project details at https://randomnerdtutorials.com  
+  Smart garden esp32 sensors unit
+  Technion IOT project
 *********/
 
 uint64_t uS_TO_S_FACTOR = 1000000;  /* Conversion factor for micro seconds to seconds */
-uint64_t TIME_TO_SLEEP = 10;        /* Time ESP32 will go to sleep (in seconds) */
+RTC_DATA_ATTR uint64_t TIME_TO_SLEEP = 10;        /* Time ESP32 will go to sleep (in seconds) */
 
 
 #include <WiFi.h>
 #include <PubSubClient.h>
 #include <Wire.h>
+
+//RTC_DATA_ATTR int recordCounter = 0; RTC_DATA_ATTR get saved in rtc memory between sleep cycles!!
 
 // Pi network info:
 const char* ssid = "SmartGarden";
@@ -31,8 +33,8 @@ const int photoresistor_pin = 35;
 const char* board_id = "1";
 
 // topics to subscribe
-const int subscriptions = 2;
-char *subscribe_to[subscriptions] = {"led", "irigation"};
+const int subscriptions = 3;
+char *subscribe_to[subscriptions] = {"led", "irigation", "sleep"};
 
 //Moisture values
 const int dry_soil_moisture_value = 2500;
@@ -90,6 +92,21 @@ void publish_msg(char* local_topic, char* msg){
   client.publish(topic, msg);
 }
 
+void handle_sleep_duration_change(String msg){
+  if (msg != ""){
+    Serial.print("Sleep duration set to ");
+    Serial.println(msg);
+    int duration = msg.toInt();
+    TIME_TO_SLEEP = duration;
+    
+    int str_len = msg.length() + 1; 
+    char char_array[str_len];
+    msg.toCharArray(char_array, str_len);
+  
+    publish_msg("sleepOK", char_array);
+  }
+}
+
 
 void handle_led(String msg){
   Serial.print("Changing output to ");
@@ -144,7 +161,7 @@ void handle_irigation(String msg){
     digitalWrite(ledPin, HIGH);
     delay(3000);
     digitalWrite(ledPin, LOW);
-    publish_msg("irigationoff", "false");
+    publish_msg("irigationOK", "false");
     Serial.println("irigation ended");
   }
 }
@@ -167,6 +184,7 @@ void callback(char* topic, byte* message, unsigned int length) {
   String local_topic = String(topic);
   if (local_topic == "led") handle_led(messageTemp);
   if (local_topic == "irigation") handle_irigation(messageTemp);
+  if (local_topic == "sleep") handle_sleep_duration_change(messageTemp);
   
 }
 
@@ -207,9 +225,9 @@ void setup() {
   if (!client.connected()) {
     reconnect();
   }
-
   handle_soil_moisture_sensor();
   handle_photoresistor_sensor();
+
   for(int i = 0; i < 10; i++){
   client.loop(); //Ensure we've sent & received everything
   delay(100);

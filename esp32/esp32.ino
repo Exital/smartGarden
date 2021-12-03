@@ -3,15 +3,14 @@
   Technion IOT project
 *********/
 
-uint64_t uS_TO_S_FACTOR = 1000000;  /* Conversion factor for micro seconds to seconds */
-RTC_DATA_ATTR uint64_t TIME_TO_SLEEP = 10;        /* Time ESP32 will go to sleep (in seconds) */
-
-
 #include <WiFi.h>
 #include <PubSubClient.h>
 #include <Wire.h>
 
-//RTC_DATA_ATTR int recordCounter = 0; RTC_DATA_ATTR get saved in rtc memory between sleep cycles!!
+uint64_t uS_TO_S_FACTOR = 1000000;  /* Conversion factor for micro seconds to seconds */
+RTC_DATA_ATTR uint64_t TIME_TO_SLEEP = 60;        /* Time ESP32 will go to sleep (in seconds) */
+
+int take_calibration_measure(int pin, int num_of_samples=10);
 
 // Pi network info:
 const char* ssid = "SmartGarden";
@@ -24,7 +23,7 @@ const char* mqtt_server = "192.168.50.10";
 const int ledPin = 26;
 
 //Soil moisture Pin (analog pin)
-const int siol_moisture_pin = 34;
+const int soil_moisture_pin = 34;
 
 //Photoresistor Pin (analog pin)
 const int photoresistor_pin = 35;
@@ -33,19 +32,45 @@ const int photoresistor_pin = 35;
 const char* board_id = "1";
 
 // topics to subscribe
-const int subscriptions = 3;
-char *subscribe_to[subscriptions] = {"led", "irigation", "sleep"};
+const int subscriptions = 5;
+char *subscribe_to[subscriptions] = {"led", "irigation", "sleep", "end_calibration", "soil_moisture_calibration"};
 
 //Moisture values
-const int dry_soil_moisture_value = 2500;
-const int wet_soil_moisture_value = 1200;
+RTC_DATA_ATTR int dry_soil_moisture_value = 2500;
+RTC_DATA_ATTR int wet_soil_moisture_value = 1200;
 
 //Photoresistor values
-const int low_value = 3000;
-const int high_value = 500;
+RTC_DATA_ATTR int low_value = 3000;
+RTC_DATA_ATTR int high_value = 500;
+
+//Calibration_mode
+bool CALIBRATION_MODE = false;
 
 WiFiClient espClient;
 PubSubClient client(espClient);
+
+void handle_wakeup_reason(){
+  esp_sleep_wakeup_cause_t wakeup_reason;
+
+  wakeup_reason = esp_sleep_get_wakeup_cause();
+
+  switch(wakeup_reason)
+  {
+    case ESP_SLEEP_WAKEUP_EXT0 : calibration_mode(); break;
+    case ESP_SLEEP_WAKEUP_TIMER : Serial.println("Wakeup caused by timer"); break;
+    default : Serial.printf("Wakeup was not caused by deep sleep: %d\n",wakeup_reason); break;
+  }
+}
+
+void calibration_mode() {
+  Serial.println("Wakeup caused by external signal using RTC_IO");
+  Serial.println("Going in calibration mode");
+  publish_msg("start_calibration", "True");
+  CALIBRATION_MODE = true;
+  while(CALIBRATION_MODE){
+    client.loop();
+  }
+}
 
 
 void setup_wifi() {
@@ -98,13 +123,41 @@ void handle_sleep_duration_change(String msg){
     Serial.println(msg);
     int duration = msg.toInt();
     TIME_TO_SLEEP = duration;
-    
-    int str_len = msg.length() + 1; 
+
+    int str_len = msg.length() + 1;
     char char_array[str_len];
     msg.toCharArray(char_array, str_len);
-  
+
     publish_msg("sleepOK", char_array);
   }
+}
+
+int take_calibration_measure(int pin, int num_of_samples){
+  delay(100);
+  int result = 0;
+  for(int i = 0; i < num_of_samples; i++){
+    result += analogRead(pin);
+    delay(100);
+  }
+  return result / num_of_samples;
+}
+
+void handle_soil_moisture_calibration(String msg){
+  if (msg == "wet"){
+    wet_soil_moisture_value = take_calibration_measure(soil_moisture_pin);
+    Serial.print("wet soil moisutre value=");
+    Serial.println(wet_soil_moisture_value);
+  }
+  if(msg == "dry"){
+    dry_soil_moisture_value = take_calibration_measure(soil_moisture_pin);
+    Serial.print("dry soil moisutre value=");
+    Serial.println(dry_soil_moisture_value);
+  }
+}
+
+void handle_calibration_off(){
+  Serial.println("Calibration mode off");
+  CALIBRATION_MODE = false;
 }
 
 
@@ -120,17 +173,17 @@ void handle_led(String msg){
 }
 
 void handle_soil_moisture_sensor(){
-  int soil_moisture = analogRead(siol_moisture_pin);
+  int soil_moisture = analogRead(soil_moisture_pin);
   int soil_moisture_percentage = map(soil_moisture, wet_soil_moisture_value, dry_soil_moisture_value, 100, 0);
-  
+
   //Serial.print(soil_moisture_percentage);// DEBUG
   //Serial.println("%");// DEBUG
-  
+
   String soil_moisture_percentage_str = String(soil_moisture_percentage);
-  int str_len = soil_moisture_percentage_str.length() + 1; 
+  int str_len = soil_moisture_percentage_str.length() + 1;
   char char_array[str_len];
   soil_moisture_percentage_str.toCharArray(char_array, str_len);
-  
+
   //publish to mqtt server
   publish_msg("soil_moisture", char_array);
 
@@ -138,18 +191,18 @@ void handle_soil_moisture_sensor(){
 
 void handle_photoresistor_sensor(){
   int photoresistor = analogRead(photoresistor_pin);
-  
+
   //Serial.println(photoresistor);// DEBUG
   int photoresistor_percentage = map(photoresistor, high_value, low_value, 100, 0);
-  
+
   //Serial.print(soil_moisture_percentage);// DEBUG
   //Serial.println("%");// DEBUG
-  
+
   String photoresistor_percentage_str = String(photoresistor_percentage);
-  int str_len = photoresistor_percentage_str.length() + 1; 
+  int str_len = photoresistor_percentage_str.length() + 1;
   char char_array[str_len];
   photoresistor_percentage_str.toCharArray(char_array, str_len);
-  
+
   //publish to mqtt server
   publish_msg("photoresistor", char_array);
 
@@ -172,7 +225,7 @@ void callback(char* topic, byte* message, unsigned int length) {
   Serial.print(topic);
   Serial.print(". Message: ");
   String messageTemp;
-  
+
   for (int i = 0; i < length; i++) {
     Serial.print((char)message[i]);
     messageTemp += (char)message[i];
@@ -185,7 +238,9 @@ void callback(char* topic, byte* message, unsigned int length) {
   if (local_topic == "led") handle_led(messageTemp);
   if (local_topic == "irigation") handle_irigation(messageTemp);
   if (local_topic == "sleep") handle_sleep_duration_change(messageTemp);
-  
+  if (local_topic == "end_calibration") handle_calibration_off();
+  if (local_topic == "soil_moisture_calibration") handle_soil_moisture_calibration(messageTemp);
+
 }
 
 void reconnect() {
@@ -208,7 +263,7 @@ void reconnect() {
 }
 
 void loop() {
-  
+
 }
 
 void setup() {
@@ -218,13 +273,15 @@ void setup() {
   client.setCallback(callback);
 
   pinMode(ledPin, OUTPUT);
-  pinMode(siol_moisture_pin, INPUT);
-  pinMode(siol_moisture_pin, INPUT);
+  pinMode(soil_moisture_pin, INPUT);
+  pinMode(photoresistor_pin, INPUT);
   Serial.println("woke up");
+  esp_sleep_enable_ext0_wakeup(GPIO_NUM_33,1); //1 = High, 0 = Low
 
   if (!client.connected()) {
     reconnect();
   }
+  handle_wakeup_reason();
   handle_soil_moisture_sensor();
   handle_photoresistor_sensor();
 

@@ -33,7 +33,7 @@ const char* board_id = "1";
 
 // topics to subscribe
 const int subscriptions = 5;
-char *subscribe_to[subscriptions] = {"led", "irigation", "sleep", "end_calibration", "soil_moisture_calibration"};
+char *subscribe_to[subscriptions] = {"led", "irigation", "sleep", "calibration", "soil_moisture_calibration"};
 
 //Moisture values
 RTC_DATA_ATTR int dry_soil_moisture_value = 2500;
@@ -65,7 +65,7 @@ void handle_wakeup_reason(){
 void calibration_mode() {
   Serial.println("Wakeup caused by external signal using RTC_IO");
   Serial.println("Going in calibration mode");
-  publish_msg("start_calibration", "True");
+  publish_msg("calibration", "start");
   CALIBRATION_MODE = true;
   while(CALIBRATION_MODE){
     client.loop();
@@ -147,11 +147,13 @@ void handle_soil_moisture_calibration(String msg){
     wet_soil_moisture_value = take_calibration_measure(soil_moisture_pin);
     Serial.print("wet soil moisutre value=");
     Serial.println(wet_soil_moisture_value);
+    publish_msg("soil_moisture_calibration", "wetOK");
   }
   if(msg == "dry"){
     dry_soil_moisture_value = take_calibration_measure(soil_moisture_pin);
     Serial.print("dry soil moisutre value=");
     Serial.println(dry_soil_moisture_value);
+    publish_msg("soil_moisture_calibration", "dryOK");
   }
 }
 
@@ -238,7 +240,7 @@ void callback(char* topic, byte* message, unsigned int length) {
   if (local_topic == "led") handle_led(messageTemp);
   if (local_topic == "irigation") handle_irigation(messageTemp);
   if (local_topic == "sleep") handle_sleep_duration_change(messageTemp);
-  if (local_topic == "end_calibration") handle_calibration_off();
+  if (local_topic == "calibration" && messageTemp == "end") handle_calibration_off();
   if (local_topic == "soil_moisture_calibration") handle_soil_moisture_calibration(messageTemp);
 
 }

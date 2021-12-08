@@ -6,6 +6,17 @@
 #include <WiFi.h>
 #include <PubSubClient.h>
 #include <Wire.h>
+#include <Servo_ESP32.h>
+
+static const int servoPin = 14; //printed G14 on the board
+
+Servo_ESP32 servo1;
+
+int angle =0;
+int angleStep = 1;
+
+int angleMin =0;
+int angleMax = 180;
 
 uint64_t uS_TO_S_FACTOR = 1000000;  /* Conversion factor for micro seconds to seconds */
 RTC_DATA_ATTR uint64_t TIME_TO_SLEEP = 60;        /* Time ESP32 will go to sleep (in seconds) */
@@ -19,8 +30,8 @@ const char* password = "technioniot";
 // MQTT Broker IP address:
 const char* mqtt_server = "192.168.50.10";
 
-// LED Pin
-const int ledPin = 26;
+// Servo Pin
+const int servo_pin = 26;
 
 //Soil moisture Pin (analog pin)
 const int soil_moisture_pin = 34;
@@ -163,17 +174,6 @@ void handle_calibration_off(){
 }
 
 
-void handle_led(String msg){
-  Serial.print("Changing output to ");
-  Serial.println(msg);
-  if(msg == "true"){
-    digitalWrite(ledPin, HIGH);
-  }
-  else if(msg == "false"){
-    digitalWrite(ledPin, LOW);
-  }
-}
-
 void handle_soil_moisture_sensor(){
   int soil_moisture = analogRead(soil_moisture_pin);
   int soil_moisture_percentage = map(soil_moisture, wet_soil_moisture_value, dry_soil_moisture_value, 100, 0);
@@ -210,12 +210,21 @@ void handle_photoresistor_sensor(){
 
 }
 
+//void handle_irigation(String msg){
+//  if(msg == "true"){
+//    Serial.println("irigation started");
+//    digitalWrite(ledPin, HIGH);
+//    delay(3000);
+//    digitalWrite(ledPin, LOW);
+//    publish_msg("irigationOK", "false");
+//    Serial.println("irigation ended");
+//  }
+//}
+
 void handle_irigation(String msg){
   if(msg == "true"){
     Serial.println("irigation started");
-    digitalWrite(ledPin, HIGH);
-    delay(3000);
-    digitalWrite(ledPin, LOW);
+    servo_move();
     publish_msg("irigationOK", "false");
     Serial.println("irigation ended");
   }
@@ -237,7 +246,6 @@ void callback(char* topic, byte* message, unsigned int length) {
   // removing board/<id>/ from topic
   topic = &topic[8];
   String local_topic = String(topic);
-  if (local_topic == "led") handle_led(messageTemp);
   if (local_topic == "irigation") handle_irigation(messageTemp);
   if (local_topic == "sleep") handle_sleep_duration_change(messageTemp);
   if (local_topic == "calibration" && messageTemp == "end") handle_calibration_off();
@@ -264,17 +272,31 @@ void reconnect() {
   }
 }
 
+void servo_move(){
+    for(int angle = 0; angle <= angleMax; angle +=angleStep) {
+      servo1.write(angle);
+      delay(20);
+  }
+  delay(2000);
+
+  for(int angle = 180; angle >= angleMin; angle -=angleStep) {
+      servo1.write(angle);
+      delay(20);
+  }
+}
+
 void loop() {
 
 }
 
 void setup() {
   Serial.begin(115200);
+  servo1.attach(servo_pin);
   setup_wifi();
   client.setServer(mqtt_server, 1883);
   client.setCallback(callback);
 
-  pinMode(ledPin, OUTPUT);
+  pinMode(servo_pin, OUTPUT);
   pinMode(soil_moisture_pin, INPUT);
   pinMode(photoresistor_pin, INPUT);
   Serial.println("woke up");

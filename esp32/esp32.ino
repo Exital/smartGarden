@@ -20,6 +20,7 @@ int angleMax = 180;
 
 uint64_t uS_TO_S_FACTOR = 1000000;  /* Conversion factor for micro seconds to seconds */
 RTC_DATA_ATTR uint64_t TIME_TO_SLEEP = 60;        /* Time ESP32 will go to sleep (in seconds) */
+int TIME_FOR_STAND_ALONE_SERVER = 60;
 
 int take_calibration_measure(int pin, int num_of_samples=10);
 
@@ -67,6 +68,8 @@ PubSubClient client(espClient);
 // ------------------------ stand alone server -----------------
 // Set web server port number to 80
 WiFiServer server(80);
+RTC_DATA_ATTR bool stand_alone_mode = false;
+bool stand_alone_server_timeout = false;
 
 // Variable to store the HTTP request
 String header;
@@ -88,9 +91,44 @@ void handle_wakeup_reason(){
 
   switch(wakeup_reason)
   {
-    case ESP_SLEEP_WAKEUP_EXT0 : calibration_mode(); break;
+    case ESP_SLEEP_WAKEUP_EXT0 : handle_external_wake_up(); break;
     case ESP_SLEEP_WAKEUP_TIMER : Serial.println("Wakeup caused by timer"); break;
     default : Serial.printf("Wakeup was not caused by deep sleep: %d\n",wakeup_reason); break;
+  }
+}
+
+void IRAM_ATTR onTimer(){
+  stand_alone_server_timeout = true;
+  Serial.println("Stand alone server timeout!");
+}
+
+void handle_external_wake_up(){
+  if (stand_alone_mode){
+    stand_alone_server_set_up();
+    /* Use 1st timer of 4 */
+  /* 1 tick take 1/(80MHZ/80) = 1us so we set divider 80 and count up */
+  hw_timer_t * timer = NULL;
+  timer = timerBegin(0, 80, true);
+
+  /* Attach onTimer function to our timer */
+  timerAttachInterrupt(timer, &onTimer, true);
+
+  /* Set alarm to call onTimer function every second 1 tick is 1us
+  => 1 second is 1000000us */
+  /* Repeat the alarm (third parameter) */
+  timerAlarmWrite(timer, uS_TO_S_FACTOR * TIME_FOR_STAND_ALONE_SERVER, false);
+
+  /* Start an alarm */
+  timerAlarmEnable(timer);
+  Serial.println("start timer");
+    // change to be 5 min of timer
+    while(!stand_alone_server_timeout){
+      stand_alone_server_loop();
+    }
+    Serial.println("going to sleep");
+    ESP.deepSleep(TIME_TO_SLEEP * uS_TO_S_FACTOR);
+  } else {
+    calibration_mode();
   }
 }
 
@@ -123,6 +161,7 @@ bool setup_wifi() {
   }
 
   if (WiFi.status() != WL_CONNECTED){
+    Serial.println("");
     Serial.println("Pi Wifi not found - stand alone mode initiating...");
     return false;
   } else {
@@ -424,7 +463,7 @@ void stand_alone_server_loop(){
 void setup() {
   Serial.begin(115200);
   servo1.attach(servo_pin);
-  bool stand_alone = !setup_wifi();
+  stand_alone_mode = !setup_wifi();
   client.setServer(mqtt_server, 1883);
   client.setCallback(callback);
 
@@ -433,12 +472,8 @@ void setup() {
   pinMode(photoresistor_pin, INPUT);
   Serial.println("woke up");
   esp_sleep_enable_ext0_wakeup(GPIO_NUM_33,1); //1 = High, 0 = Low
-  if (stand_alone){
-    stand_alone_server_set_up();
-    while(true){
-      stand_alone_server_loop();
-    }
-  } else if (!client.connected()) {
+
+  if (!client.connected() && !stand_alone_mode) {
       reconnect();
   }
 

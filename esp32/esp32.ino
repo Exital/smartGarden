@@ -27,6 +27,10 @@ int take_calibration_measure(int pin, int num_of_samples=10);
 const char* ssid = "SmartGarden";
 const char* password = "technioniot";
 
+//ESP32 network info:
+const char* esp32_ssid     = "ESP32-Access-Point";
+const char* esp32_password = "123456789";
+
 // MQTT Broker IP address:
 const char* mqtt_server = "192.168.50.10";
 
@@ -60,6 +64,23 @@ bool CALIBRATION_MODE = false;
 WiFiClient espClient;
 PubSubClient client(espClient);
 
+// ------------------------ stand alone server -----------------
+// Set web server port number to 80
+WiFiServer server(80);
+
+// Variable to store the HTTP request
+String header;
+
+// Auxiliar variables to store the current output state
+String output26State = "off";
+String output27State = "off";
+
+// Assign output variables to GPIO pins
+const int output26 = 26;
+const int output27 = 27;
+
+// -------------------------------------------------------------
+
 void handle_wakeup_reason(){
   esp_sleep_wakeup_cause_t wakeup_reason;
 
@@ -84,7 +105,7 @@ void calibration_mode() {
 }
 
 
-void setup_wifi() {
+bool setup_wifi() {
   delay(10);
   // We start by connecting to a WiFi network
   Serial.println();
@@ -92,16 +113,25 @@ void setup_wifi() {
   Serial.println(ssid);
 
   WiFi.begin(ssid, password);
-
-  while (WiFi.status() != WL_CONNECTED) {
+  int retries = 30;
+  for(int i = 0; i < retries; i++){
     delay(500);
     Serial.print(".");
+    if (WiFi.status() == WL_CONNECTED){
+      break;
+    }
   }
 
-  Serial.println("");
-  Serial.println("WiFi connected");
-  Serial.println("IP address: ");
-  Serial.println(WiFi.localIP());
+  if (WiFi.status() != WL_CONNECTED){
+    Serial.println("Pi Wifi not found - stand alone mode initiating...");
+    return false;
+  } else {
+    Serial.println("");
+    Serial.println("WiFi connected");
+    Serial.println("IP address: ");
+    Serial.println(WiFi.localIP());
+    return true;
+  }
 }
 
 void make_subscriptions(){
@@ -188,7 +218,6 @@ void handle_soil_moisture_sensor(){
 
   //publish to mqtt server
   publish_msg("soil_moisture", char_array);
-
 }
 
 void handle_photoresistor_sensor(){
@@ -207,19 +236,7 @@ void handle_photoresistor_sensor(){
 
   //publish to mqtt server
   publish_msg("photoresistor", char_array);
-
 }
-
-//void handle_irigation(String msg){
-//  if(msg == "true"){
-//    Serial.println("irigation started");
-//    digitalWrite(ledPin, HIGH);
-//    delay(3000);
-//    digitalWrite(ledPin, LOW);
-//    publish_msg("irigationOK", "false");
-//    Serial.println("irigation ended");
-//  }
-//}
 
 void handle_irigation(String msg){
   if(msg == "true"){
@@ -289,10 +306,125 @@ void loop() {
 
 }
 
+void stand_alone_server_set_up(){
+  // Initialize the output variables as outputs
+  pinMode(output26, OUTPUT);
+  pinMode(output27, OUTPUT);
+  // Set outputs to LOW
+  digitalWrite(output26, LOW);
+  digitalWrite(output27, LOW);
+
+  // Connect to Wi-Fi network with SSID and password
+  Serial.print("Setting AP (Access Point)…");
+  // Remove the password parameter, if you want the AP (Access Point) to be open
+  WiFi.softAP(esp32_ssid, esp32_password);
+
+  IPAddress IP = WiFi.softAPIP();
+  Serial.print("AP IP address: ");
+  Serial.println(IP);
+  
+  server.begin();
+}
+
+void stand_alone_server_loop(){
+  WiFiClient client = server.available();   // Listen for incoming clients
+
+  if (client) {                             // If a new client connects,
+    Serial.println("New Client.");          // print a message out in the serial port
+    String currentLine = "";                // make a String to hold incoming data from the client
+    while (client.connected()) {            // loop while the client's connected
+      if (client.available()) {             // if there's bytes to read from the client,
+        char c = client.read();             // read a byte, then
+        Serial.write(c);                    // print it out the serial monitor
+        header += c;
+        if (c == '\n') {                    // if the byte is a newline character
+          // if the current line is blank, you got two newline characters in a row.
+          // that's the end of the client HTTP request, so send a response:
+          if (currentLine.length() == 0) {
+            // HTTP headers always start with a response code (e.g. HTTP/1.1 200 OK)
+            // and a content-type so the client knows what's coming, then a blank line:
+            client.println("HTTP/1.1 200 OK");
+            client.println("Content-type:text/html");
+            client.println("Connection: close");
+            client.println();
+            
+            // turns the GPIOs on and off
+            if (header.indexOf("GET /26/on") >= 0) {
+              Serial.println("GPIO 26 on");
+              output26State = "on";
+              digitalWrite(output26, HIGH);
+            } else if (header.indexOf("GET /26/off") >= 0) {
+              Serial.println("GPIO 26 off");
+              output26State = "off";
+              digitalWrite(output26, LOW);
+            } else if (header.indexOf("GET /27/on") >= 0) {
+              Serial.println("GPIO 27 on");
+              output27State = "on";
+              digitalWrite(output27, HIGH);
+            } else if (header.indexOf("GET /27/off") >= 0) {
+              Serial.println("GPIO 27 off");
+              output27State = "off";
+              digitalWrite(output27, LOW);
+            }
+            
+            // Display the HTML web page
+            client.println("<!DOCTYPE html><html>");
+            client.println("<head><meta name=\"viewport\" content=\"width=device-width, initial-scale=1\">");
+            client.println("<link rel=\"icon\" href=\"data:,\">");
+            // CSS to style the on/off buttons 
+            // Feel free to change the background-color and font-size attributes to fit your preferences
+            client.println("<style>html { font-family: Helvetica; display: inline-block; margin: 0px auto; text-align: center;}");
+            client.println(".button { background-color: #4CAF50; border: none; color: white; padding: 16px 40px;");
+            client.println("text-decoration: none; font-size: 30px; margin: 2px; cursor: pointer;}");
+            client.println(".button2 {background-color: #555555;}</style></head>");
+            
+            // Web Page Heading
+            client.println("<body><h1>ESP32 Web Server</h1>");
+            
+            // Display current state, and ON/OFF buttons for GPIO 26  
+            client.println("<p>GPIO 26 - State " + output26State + "</p>");
+            // If the output26State is off, it displays the ON button       
+            if (output26State=="off") {
+              client.println("<p><a href=\"/26/on\"><button class=\"button\">ON</button></a></p>");
+            } else {
+              client.println("<p><a href=\"/26/off\"><button class=\"button button2\">OFF</button></a></p>");
+            } 
+               
+            // Display current state, and ON/OFF buttons for GPIO 27  
+            client.println("<p>GPIO 27 - State " + output27State + "</p>");
+            // If the output27State is off, it displays the ON button       
+            if (output27State=="off") {
+              client.println("<p><a href=\"/27/on\"><button class=\"button\">ON</button></a></p>");
+            } else {
+              client.println("<p><a href=\"/27/off\"><button class=\"button button2\">OFF</button></a></p>");
+            }
+            client.println("</body></html>");
+            
+            // The HTTP response ends with another blank line
+            client.println();
+            // Break out of the while loop
+            break;
+          } else { // if you got a newline, then clear currentLine
+            currentLine = "";
+          }
+        } else if (c != '\r') {  // if you got anything else but a carriage return character,
+          currentLine += c;      // add it to the end of the currentLine
+        }
+      }
+    }
+    // Clear the header variable
+    header = "";
+    // Close the connection
+    client.stop();
+    Serial.println("Client disconnected.");
+    Serial.println("");
+  }
+}
+
 void setup() {
   Serial.begin(115200);
   servo1.attach(servo_pin);
-  setup_wifi();
+  bool stand_alone = !setup_wifi();
   client.setServer(mqtt_server, 1883);
   client.setCallback(callback);
 
@@ -301,10 +433,15 @@ void setup() {
   pinMode(photoresistor_pin, INPUT);
   Serial.println("woke up");
   esp_sleep_enable_ext0_wakeup(GPIO_NUM_33,1); //1 = High, 0 = Low
-
-  if (!client.connected()) {
-    reconnect();
+  if (stand_alone){
+    stand_alone_server_set_up();
+    while(true){
+      stand_alone_server_loop();
+    }
+  } else if (!client.connected()) {
+      reconnect();
   }
+
   handle_wakeup_reason();
   handle_soil_moisture_sensor();
   handle_photoresistor_sensor();

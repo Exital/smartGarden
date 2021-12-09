@@ -20,7 +20,7 @@ int angleMax = 180;
 
 uint64_t uS_TO_S_FACTOR = 1000000;  /* Conversion factor for micro seconds to seconds */
 RTC_DATA_ATTR uint64_t TIME_TO_SLEEP = 60;        /* Time ESP32 will go to sleep (in seconds) */
-int TIME_FOR_STAND_ALONE_SERVER = 60;
+int TIME_FOR_STAND_ALONE_SERVER = 300;
 
 int take_calibration_measure(int pin, int num_of_samples=10);
 
@@ -196,6 +196,17 @@ void publish_msg(char* local_topic, char* msg){
   strcat(topic,local_topic);
   client.publish(topic, msg);
 }
+
+void send_sleep_time(){
+  int duration = TIME_TO_SLEEP;
+  String duration_str = String(duration);
+  int str_len = duration_str.length() + 1;
+  char char_array[str_len];
+  duration_str.toCharArray(char_array, str_len);
+
+  publish_msg("sleepTime", char_array);
+}
+
 
 void handle_sleep_duration_change(String msg){
   if (msg != ""){
@@ -437,6 +448,9 @@ void stand_alone_server_loop(){
             } else {
               client.println("<p><a href=\"/27/off\"><button class=\"button button2\">OFF</button></a></p>");
             }
+            client.println("<p>sleep time out ");
+            client.println(TIME_FOR_STAND_ALONE_SERVER);
+            client.println("</p>");
             client.println("</body></html>");
             
             // The HTTP response ends with another blank line
@@ -476,6 +490,7 @@ void setup() {
   if (!client.connected() && !stand_alone_mode) {
       reconnect();
   }
+  publish_msg("comOK", "true");
 
   handle_wakeup_reason();
   handle_soil_moisture_sensor();
@@ -485,6 +500,7 @@ void setup() {
   client.loop(); //Ensure we've sent & received everything
   delay(100);
   }
+  send_sleep_time();
   Serial.println("going to sleep");
   ESP.deepSleep(TIME_TO_SLEEP * uS_TO_S_FACTOR);
 }

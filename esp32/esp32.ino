@@ -6,11 +6,9 @@
 #include <WiFi.h>
 #include <PubSubClient.h>
 #include <Wire.h>
-#include <Servo_ESP32.h>
+#include <Servo.h>
 
-static const int servoPin = 14; //printed G14 on the board
-
-Servo_ESP32 servo1;
+Servo servo1;
 
 int angle =0;
 int angleStep = 1;

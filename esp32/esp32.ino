@@ -18,7 +18,7 @@ int angleMax = 180;
 
 uint64_t uS_TO_S_FACTOR = 1000000;  /* Conversion factor for micro seconds to seconds */
 RTC_DATA_ATTR uint64_t TIME_TO_SLEEP = 60;        /* Time ESP32 will go to sleep (in seconds) */
-int TIME_FOR_STAND_ALONE_SERVER = 300;
+int TIME_FOR_STAND_ALONE_SERVER = 300;            /* Time ESP32 of stand alone server (in seconds) */
 
 int take_calibration_measure(int pin, int num_of_samples=10);
 
@@ -27,8 +27,7 @@ const char* ssid = "SmartGarden";
 const char* password = "technioniot";
 
 //ESP32 network info:
-const char* esp32_ssid     = "ESP32-Access-Point";
-const char* esp32_password = "123456789";
+const char* esp32_ssid     = "server";
 
 // MQTT Broker IP address:
 const char* mqtt_server = "192.168.50.10";
@@ -119,7 +118,6 @@ void handle_external_wake_up(){
   /* Start an alarm */
   timerAlarmEnable(timer);
   Serial.println("start timer");
-    // change to be 5 min of timer
     while(!stand_alone_server_timeout){
       stand_alone_server_loop();
     }
@@ -364,13 +362,13 @@ void stand_alone_server_set_up(){
 
   // Connect to Wi-Fi network with SSID and password
   Serial.print("Setting AP (Access Point)…");
-  // Remove the password parameter, if you want the AP (Access Point) to be open
-  WiFi.softAP(esp32_ssid, esp32_password);
+  // TODO: change the esp_ssid to be 'Board<id>_Server' dynamicly using the board_id variable
+  WiFi.softAP(esp32_ssid, password);
 
   IPAddress IP = WiFi.softAPIP();
   Serial.print("AP IP address: ");
   Serial.println(IP);
-  
+
   server.begin();
 }
 
@@ -395,7 +393,7 @@ void stand_alone_server_loop(){
             client.println("Content-type:text/html");
             client.println("Connection: close");
             client.println();
-            
+
             // turns the GPIOs on and off
             if (header.indexOf("GET /26/on") >= 0) {
               Serial.println("GPIO 26 on");
@@ -414,33 +412,33 @@ void stand_alone_server_loop(){
               output27State = "off";
               digitalWrite(output27, LOW);
             }
-            
+
             // Display the HTML web page
             client.println("<!DOCTYPE html><html>");
             client.println("<head><meta name=\"viewport\" content=\"width=device-width, initial-scale=1\">");
             client.println("<link rel=\"icon\" href=\"data:,\">");
-            // CSS to style the on/off buttons 
+            // CSS to style the on/off buttons
             // Feel free to change the background-color and font-size attributes to fit your preferences
             client.println("<style>html { font-family: Helvetica; display: inline-block; margin: 0px auto; text-align: center;}");
             client.println(".button { background-color: #4CAF50; border: none; color: white; padding: 16px 40px;");
             client.println("text-decoration: none; font-size: 30px; margin: 2px; cursor: pointer;}");
             client.println(".button2 {background-color: #555555;}</style></head>");
-            
+
             // Web Page Heading
-            client.println("<body><h1>ESP32 Web Server</h1>");
-            
-            // Display current state, and ON/OFF buttons for GPIO 26  
+            client.println("<body><h1>Stand Mode Server</h1>");
+
+            // Display current state, and ON/OFF buttons for GPIO 26
             client.println("<p>GPIO 26 - State " + output26State + "</p>");
-            // If the output26State is off, it displays the ON button       
+            // If the output26State is off, it displays the ON button
             if (output26State=="off") {
               client.println("<p><a href=\"/26/on\"><button class=\"button\">ON</button></a></p>");
             } else {
               client.println("<p><a href=\"/26/off\"><button class=\"button button2\">OFF</button></a></p>");
-            } 
-               
-            // Display current state, and ON/OFF buttons for GPIO 27  
+            }
+
+            // Display current state, and ON/OFF buttons for GPIO 27
             client.println("<p>GPIO 27 - State " + output27State + "</p>");
-            // If the output27State is off, it displays the ON button       
+            // If the output27State is off, it displays the ON button
             if (output27State=="off") {
               client.println("<p><a href=\"/27/on\"><button class=\"button\">ON</button></a></p>");
             } else {
@@ -450,7 +448,7 @@ void stand_alone_server_loop(){
             client.println(TIME_FOR_STAND_ALONE_SERVER);
             client.println("</p>");
             client.println("</body></html>");
-            
+
             // The HTTP response ends with another blank line
             client.println();
             // Break out of the while loop

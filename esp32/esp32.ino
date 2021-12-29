@@ -45,16 +45,16 @@ const int photoresistor_pin = 35;
 const char* board_id = "1";
 
 // topics to subscribe
-const int subscriptions = 5;
-char *subscribe_to[subscriptions] = {"led", "irigation", "sleep", "calibration", "soil_moisture_calibration"};
+const int subscriptions = 6;
+char *subscribe_to[subscriptions] = {"led", "irigation", "sleep", "calibration", "soil_moisture_calibration", "light_calibration"};
 
 //Moisture values
 RTC_DATA_ATTR int dry_soil_moisture_value = 2500;
 RTC_DATA_ATTR int wet_soil_moisture_value = 1200;
 
 //Photoresistor values
-RTC_DATA_ATTR int low_value = 3000;
-RTC_DATA_ATTR int high_value = 500;
+RTC_DATA_ATTR int dark_value = 3000;
+RTC_DATA_ATTR int light_value = 500;
 
 //Calibration_mode
 bool CALIBRATION_MODE = false;
@@ -244,6 +244,21 @@ void handle_soil_moisture_calibration(String msg){
   }
 }
 
+void handle_light_calibration(String msg){
+  if (msg == "dark"){
+    dark_value = take_calibration_measure(photoresistor_pin);
+    Serial.print("light sensor dark value=");
+    Serial.println(dark_value);
+    publish_msg("light_calibration", "darkOK");
+  }
+  if(msg == "light"){
+    light_value = take_calibration_measure(photoresistor_pin);
+    Serial.print("light sensor light value=");
+    Serial.println(light_value);
+    publish_msg("light_calibration", "lightOK");
+  }
+}
+
 void handle_calibration_off(){
   Serial.println("Calibration mode off");
   CALIBRATION_MODE = false;
@@ -270,7 +285,7 @@ void handle_photoresistor_sensor(){
   int photoresistor = analogRead(photoresistor_pin);
 
   //Serial.println(photoresistor);// DEBUG
-  int photoresistor_percentage = map(photoresistor, high_value, low_value, 100, 0);
+  int photoresistor_percentage = map(photoresistor, light_value, dark_value, 100, 0);
 
   //Serial.print(soil_moisture_percentage);// DEBUG
   //Serial.println("%");// DEBUG
@@ -313,7 +328,7 @@ void callback(char* topic, byte* message, unsigned int length) {
   if (local_topic == "sleep") handle_sleep_duration_change(messageTemp);
   if (local_topic == "calibration" && messageTemp == "end") handle_calibration_off();
   if (local_topic == "soil_moisture_calibration") handle_soil_moisture_calibration(messageTemp);
-
+  if (local_topic == "light_calibration") handle_light_calibration(messageTemp);
 }
 
 void reconnect() {

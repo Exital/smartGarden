@@ -6,10 +6,13 @@
 #include <WiFi.h>
 #include <PubSubClient.h>
 #include <Wire.h>
+#include <Adafruit_Sensor.h>
+#include <Adafruit_BMP280.h>
 #include <Servo.h>
 
 Servo servo1;
 
+Adafruit_BMP280 bmp;        /* bmp instance to read bmp values*/
 int angle =0;
 int angleStep = 1;
 
@@ -18,7 +21,10 @@ int angleMax = 180;
 
 uint64_t uS_TO_S_FACTOR = 1000000;  /* Conversion factor for micro seconds to seconds */
 RTC_DATA_ATTR uint64_t TIME_TO_SLEEP = 60;        /* Time ESP32 will go to sleep (in seconds) */
-int TIME_FOR_STAND_ALONE_SERVER = 300;            /* Time ESP32 of stand alone server (in seconds) */
+int TIME_FOR_STAND_ALONE_SERVER = 600;            /* Time ESP32 of stand alone server (in seconds) */
+RTC_DATA_ATTR int soil_moisture_value = -1;            /* Global moisture percentage value*/
+RTC_DATA_ATTR int photoresistor_value = -1;            /* Global photoresistor percentage value*/
+RTC_DATA_ATTR int temprature_value = -100;             /* Global temprature percentage value*/
 
 int take_calibration_measure(int pin, int num_of_samples=10);
 
@@ -45,16 +51,16 @@ const int photoresistor_pin = 35;
 const char* board_id = "1";
 
 // topics to subscribe
-const int subscriptions = 6;
-char *subscribe_to[subscriptions] = {"led", "irigation", "sleep", "calibration", "soil_moisture_calibration", "light_calibration"};
+const int subscriptions = 5;
+char *subscribe_to[subscriptions] = {"led", "irigation", "sleep", "calibration", "soil_moisture_calibration"};
 
 //Moisture values
 RTC_DATA_ATTR int dry_soil_moisture_value = 2500;
 RTC_DATA_ATTR int wet_soil_moisture_value = 1200;
 
 //Photoresistor values
-RTC_DATA_ATTR int dark_value = 3000;
-RTC_DATA_ATTR int light_value = 500;
+RTC_DATA_ATTR int low_value = 3000;
+RTC_DATA_ATTR int high_value = 500;
 
 //Calibration_mode
 bool CALIBRATION_MODE = false;
@@ -147,7 +153,7 @@ bool setup_wifi() {
   Serial.println(ssid);
 
   WiFi.begin(ssid, password);
-  int retries = 30;
+  int retries = 10;
   for(int i = 0; i < retries; i++){
     delay(500);
     Serial.print(".");
@@ -244,21 +250,6 @@ void handle_soil_moisture_calibration(String msg){
   }
 }
 
-void handle_light_calibration(String msg){
-  if (msg == "dark"){
-    dark_value = take_calibration_measure(photoresistor_pin);
-    Serial.print("light sensor dark value=");
-    Serial.println(dark_value);
-    publish_msg("light_calibration", "darkOK");
-  }
-  if(msg == "light"){
-    light_value = take_calibration_measure(photoresistor_pin);
-    Serial.print("light sensor light value=");
-    Serial.println(light_value);
-    publish_msg("light_calibration", "lightOK");
-  }
-}
-
 void handle_calibration_off(){
   Serial.println("Calibration mode off");
   CALIBRATION_MODE = false;
@@ -279,13 +270,14 @@ void handle_soil_moisture_sensor(){
 
   //publish to mqtt server
   publish_msg("soil_moisture", char_array);
+  soil_moisture_value = soil_moisture_percentage;
 }
 
 void handle_photoresistor_sensor(){
   int photoresistor = analogRead(photoresistor_pin);
 
   //Serial.println(photoresistor);// DEBUG
-  int photoresistor_percentage = map(photoresistor, light_value, dark_value, 100, 0);
+  int photoresistor_percentage = map(photoresistor, high_value, low_value, 100, 0);
 
   //Serial.print(soil_moisture_percentage);// DEBUG
   //Serial.println("%");// DEBUG
@@ -297,6 +289,28 @@ void handle_photoresistor_sensor(){
 
   //publish to mqtt server
   publish_msg("photoresistor", char_array);
+  photoresistor_value = photoresistor_percentage;
+}
+
+void handle_temprature_sensor(){
+  //bmp.readPressure()/100); //displaying the Pressure in hPa, you can change the unit
+  //bmp.readAltitude(1019.66)); //The "1019.66" is the pressure(hPa) at sea level in day in your region
+  int temprature = bmp.readTemperature();
+
+  //Serial.println(temprature);// DEBUG
+
+
+  //Serial.print(temprature);// DEBUG
+  //Serial.println("%");// DEBUG
+
+  String temprature_str = String(temprature);
+  int str_len = temprature_str.length() + 1;
+  char char_array[str_len];
+  temprature_str.toCharArray(char_array, str_len);
+
+  //publish to mqtt server
+  publish_msg("photoresistor", char_array);
+  temprature_value = temprature;
 }
 
 void handle_irigation(String msg){
@@ -328,7 +342,7 @@ void callback(char* topic, byte* message, unsigned int length) {
   if (local_topic == "sleep") handle_sleep_duration_change(messageTemp);
   if (local_topic == "calibration" && messageTemp == "end") handle_calibration_off();
   if (local_topic == "soil_moisture_calibration") handle_soil_moisture_calibration(messageTemp);
-  if (local_topic == "light_calibration") handle_light_calibration(messageTemp);
+
 }
 
 void reconnect() {
@@ -378,13 +392,33 @@ void stand_alone_server_set_up(){
   // Connect to Wi-Fi network with SSID and password
   Serial.print("Setting AP (Access Point)…");
   // TODO: change the esp_ssid to be 'Board<id>_Server' dynamicly using the board_id variable
-  WiFi.softAP(esp32_ssid, password);
+  char server_name[256];
+  const char *board = "Board_";
+  strcpy(server_name,board);
+  strcat(server_name,board_id);
+  strcat(server_name,"_Server");
+  WiFi.softAP(server_name, password);
 
   IPAddress IP = WiFi.softAPIP();
   Serial.print("AP IP address: ");
   Serial.println(IP);
 
   server.begin();
+}
+
+
+void create_html_data_table(WiFiClient* server){
+
+  call_sensors_handlers();
+  server->println("<h2>נתוני חיישנים</h2>");  
+  server->println("<table class=\"center\"><tr><th>חיישן</th><th>ערך</th></tr>");
+  server->println("<tr><td>לחות</td><td>");
+  server->println(soil_moisture_value);
+  server->println("%</td></tr>");
+  server->println("<tr><td>אור</td><td>");
+  server->println(photoresistor_value);
+  server->println("%</td></tr></table>");
+
 }
 
 void stand_alone_server_loop(){
@@ -430,14 +464,20 @@ void stand_alone_server_loop(){
 
             // Display the HTML web page
             client.println("<!DOCTYPE html><html>");
+            client.println("<html lang=\"he\" dir=\"rtl\">");
             client.println("<head><meta name=\"viewport\" content=\"width=device-width, initial-scale=1\">");
+            client.println("<meta charset=\"utf-8\">");
             client.println("<link rel=\"icon\" href=\"data:,\">");
             // CSS to style the on/off buttons
             // Feel free to change the background-color and font-size attributes to fit your preferences
             client.println("<style>html { font-family: Helvetica; display: inline-block; margin: 0px auto; text-align: center;}");
             client.println(".button { background-color: #4CAF50; border: none; color: white; padding: 16px 40px;");
             client.println("text-decoration: none; font-size: 30px; margin: 2px; cursor: pointer;}");
-            client.println(".button2 {background-color: #555555;}</style></head>");
+            client.println(".button2 {background-color: #555555;}");
+            client.println("table {font-family: arial, sans-serif; text-align: center; border-collapse: collapse; border: 1px solid #ddd; width: 60%;}");
+            client.println("td, th {border: 1px solid #ddd; text-align: center; padding: 15px;}");
+            client.println("table.center {margin-left: auto; margin-right: auto;}</style></head>");
+
 
             // Web Page Heading
             client.println("<body><h1>Stand Mode Server</h1>");
@@ -459,9 +499,10 @@ void stand_alone_server_loop(){
             } else {
               client.println("<p><a href=\"/27/off\"><button class=\"button button2\">OFF</button></a></p>");
             }
-            client.println("<p>sleep time out ");
-            client.println(TIME_FOR_STAND_ALONE_SERVER);
-            client.println("</p>");
+            //client.println("<p>sleep time out ");
+            //client.println(TIME_FOR_STAND_ALONE_SERVER);
+            //client.println("</p>");
+            create_html_data_table(&client);
             client.println("</body></html>");
 
             // The HTTP response ends with another blank line
@@ -485,6 +526,11 @@ void stand_alone_server_loop(){
   }
 }
 
+void call_sensors_handlers(){
+  handle_soil_moisture_sensor();
+  handle_photoresistor_sensor();
+}
+
 void setup() {
   Serial.begin(115200);
   servo1.attach(servo_pin);
@@ -504,8 +550,7 @@ void setup() {
   publish_msg("comOK", "true");
 
   handle_wakeup_reason();
-  handle_soil_moisture_sensor();
-  handle_photoresistor_sensor();
+  call_sensors_handlers();
 
   for(int i = 0; i < 10; i++){
   client.loop(); //Ensure we've sent & received everything

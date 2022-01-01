@@ -456,6 +456,7 @@ void stand_alone_server_loop(){
             client.println("<!DOCTYPE html><html>");
             client.println("<html lang=\"he\" dir=\"rtl\">");
             client.println("<head><meta name=\"viewport\" content=\"width=device-width, initial-scale=1\">");
+            client.println("<meta http-equiv='refresh' content='5'/>");
             client.println("<meta charset=\"utf-8\">");
             client.println("<link rel=\"icon\" href=\"data:,\">");
             // CSS to style the on/off buttons

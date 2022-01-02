@@ -21,7 +21,7 @@ RTC_DATA_ATTR uint64_t TIME_TO_SLEEP = 60;        /* Time ESP32 will go to sleep
 int TIME_FOR_STAND_ALONE_SERVER = 600;            /* Time ESP32 of stand alone server (in seconds) */
 RTC_DATA_ATTR int soil_moisture_value = -1;            /* Global moisture percentage value*/
 RTC_DATA_ATTR int photoresistor_value = -1;            /* Global photoresistor percentage value*/
-
+RTC_DATA_ATTR int battery_percentage = -1;            /* Global battery percentage value*/
 int take_calibration_measure(int pin, int num_of_samples=10);
 
 // Pi network info:
@@ -42,6 +42,9 @@ const int soil_moisture_pin = 34;
 
 //Photoresistor Pin (analog pin)
 const int photoresistor_pin = 35;
+
+//Battery monitoring pin
+const int battery_monitor_pin = 36;
 
 // Board id
 const char* board_id = "1";
@@ -271,6 +274,30 @@ void handle_light_calibration(String msg){
 void handle_calibration_off(){
   Serial.println("Calibration mode off");
   CALIBRATION_MODE = false;
+}
+
+float mapfloat(float x, float in_min, float in_max, float out_min, float out_max)
+{
+  return (x - in_min) * (out_max - out_min) / (in_max - in_min) + out_min;
+}
+
+void handle_battery_level(){
+  int monitor_value = analogRead(battery_monitor_pin);
+  float voltage = (((monitor_value * 3.3) / 1024 ) * 2);
+  battery_percentage = mapfloat(voltage, 2.8, 4.2, 0, 100);
+
+  if(battery_percentage >= 100) battery_percentage = 100;
+  if(battery_percentage < 0) battery_percentage = 0;
+
+  Serial.print("Battery percentage=");
+  Serial.println(battery_percentage);
+
+  String battery_percentage_str = String(battery_percentage);
+  int str_len = battery_percentage_str.length() + 1;
+  char char_array[str_len];
+  battery_percentage_str.toCharArray(char_array, str_len);
+
+  publish_msg("battery_percentage", char_array);
 }
 
 
@@ -527,6 +554,7 @@ void stand_alone_server_loop(){
 void call_sensors_handlers(){
   handle_soil_moisture_sensor();
   handle_photoresistor_sensor();
+  handle_battery_level();
 }
 
 void handle_timeout_comOK(){
@@ -541,7 +569,6 @@ void setup() {
   stand_alone_mode = !setup_wifi();
   client.setServer(mqtt_server, 1883);
   client.setCallback(callback);
-
   pinMode(servo_pin, OUTPUT);
   pinMode(soil_moisture_pin, INPUT);
   pinMode(photoresistor_pin, INPUT);

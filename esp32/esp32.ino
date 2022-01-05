@@ -285,8 +285,6 @@ void handle_battery_level(){
   int monitor_value = analogRead(battery_monitor_pin);
   float calibration = 0.2;
   float voltage = (((monitor_value * 3.3) / 4096 ) * 2) + calibration;
-  Serial.print("Voltage=");
-  Serial.println(voltage);
   battery_percentage = mapfloat(voltage, 3.3, 4.1, 0, 100);
 
   if(battery_percentage >= 100) battery_percentage = 100;
@@ -439,6 +437,9 @@ void create_html_data_table(WiFiClient* server){
   call_sensors_handlers();
   server->println("<h2>נתוני חיישנים</h2>");  
   server->println("<table class=\"center\"><tr><th>חיישן</th><th>ערך</th></tr>");
+  server->println("<tr><td>סוללה</td><td>");
+  server->println(battery_percentage);
+  server->println("%</td></tr>");
   server->println("<tr><td>לחות</td><td>");
   server->println(soil_moisture_value);
   server->println("%</td></tr>");

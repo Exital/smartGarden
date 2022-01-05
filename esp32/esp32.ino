@@ -44,7 +44,7 @@ const int soil_moisture_pin = 34;
 const int photoresistor_pin = 35;
 
 //Battery monitoring pin
-const int battery_monitor_pin = 36;
+const int battery_monitor_pin = 39;
 
 // Board id
 const char* board_id = "1";
@@ -283,8 +283,11 @@ float mapfloat(float x, float in_min, float in_max, float out_min, float out_max
 
 void handle_battery_level(){
   int monitor_value = analogRead(battery_monitor_pin);
-  float voltage = (((monitor_value * 3.3) / 1024 ) * 2);
-  battery_percentage = mapfloat(voltage, 2.8, 4.2, 0, 100);
+  float calibration = 0.2;
+  float voltage = (((monitor_value * 3.3) / 4096 ) * 2) + calibration;
+  Serial.print("Voltage=");
+  Serial.println(voltage);
+  battery_percentage = mapfloat(voltage, 3.3, 4.1, 0, 100);
 
   if(battery_percentage >= 100) battery_percentage = 100;
   if(battery_percentage < 0) battery_percentage = 0;

@@ -193,6 +193,13 @@ void publish_msg(char* local_topic, char* msg){
   strcat(topic,"/");
   strcat(topic,local_topic);
   client.publish(topic, msg);
+  Serial.print("Publishing topic=");
+  Serial.print(topic);
+  Serial.print(" msg=");
+  Serial.println(msg);
+  for(int i = 0; i < 20; i++){
+  client.loop(); //Ensure we've sent & received everything
+  }
 }
 
 void send_sleep_time(){
@@ -522,6 +529,12 @@ void call_sensors_handlers(){
   handle_photoresistor_sensor();
 }
 
+void handle_timeout_comOK(){
+  send_sleep_time();
+  delay(200);
+  publish_msg("comOK", "true");
+}
+
 void setup() {
   Serial.begin(115200);
   servo1.attach(servo_pin);
@@ -538,7 +551,7 @@ void setup() {
   if (!client.connected() && !stand_alone_mode) {
       reconnect();
   }
-  publish_msg("comOK", "true");
+
 
   handle_wakeup_reason();
   call_sensors_handlers();
@@ -547,7 +560,7 @@ void setup() {
   client.loop(); //Ensure we've sent & received everything
   delay(100);
   }
-  send_sleep_time();
+  handle_timeout_comOK();
   Serial.println("going to sleep");
   ESP.deepSleep(TIME_TO_SLEEP * uS_TO_S_FACTOR);
 }

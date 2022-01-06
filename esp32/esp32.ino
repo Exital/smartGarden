@@ -340,7 +340,7 @@ void reconnect() {
   while (!client.connected()) {
     Serial.print("Attempting MQTT connection...");
     // Attempt to connect
-    if (client.connect("ESP32Client")) {
+    if (client.connect(board_id)) {
       Serial.println("connected");
       // Subscribe
       make_subscriptions();
@@ -543,7 +543,7 @@ void setup() {
   handle_wakeup_reason();
   call_sensors_handlers();
 
-  for(int i = 0; i < 10; i++){
+  for(int i = 0; i < 20; i++){
   client.loop(); //Ensure we've sent & received everything
   delay(100);
   }

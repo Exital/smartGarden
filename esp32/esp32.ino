@@ -20,7 +20,7 @@ int angleMin =0;
 int angleMax = 180;
 
 uint64_t uS_TO_S_FACTOR = 1000000;  /* Conversion factor for micro seconds to seconds */
-RTC_DATA_ATTR uint64_t TIME_TO_SLEEP = 60;        /* Time ESP32 will go to sleep (in seconds) */
+RTC_DATA_ATTR uint64_t TIME_TO_SLEEP = 10;        /* Time ESP32 will go to sleep (in seconds) */
 int TIME_FOR_STAND_ALONE_SERVER = 600;            /* Time ESP32 of stand alone server (in seconds) */
 RTC_DATA_ATTR int soil_moisture_value = -1;            /* Global moisture percentage value*/
 RTC_DATA_ATTR int photoresistor_value = -1;            /* Global photoresistor percentage value*/
@@ -262,7 +262,12 @@ void handle_soil_moisture_sensor(){
 
   //Serial.print(soil_moisture_percentage);// DEBUG
   //Serial.println("%");// DEBUG
-
+  if(soil_moisture_percentage < 0){
+    soil_moisture_percentage = 0;
+  }
+  if(soil_moisture_percentage > 100){
+    soil_moisture_percentage = 100;
+  }
   String soil_moisture_percentage_str = String(soil_moisture_percentage);
   int str_len = soil_moisture_percentage_str.length() + 1;
   char char_array[str_len];
@@ -281,6 +286,12 @@ void handle_photoresistor_sensor(){
 
   //Serial.print(soil_moisture_percentage);// DEBUG
   //Serial.println("%");// DEBUG
+  if(photoresistor_percentage < 0){
+    photoresistor_percentage = 0;
+  }
+  if(photoresistor_percentage > 100){
+    photoresistor_percentage = 100;
+  }
 
   String photoresistor_percentage_str = String(photoresistor_percentage);
   int str_len = photoresistor_percentage_str.length() + 1;
@@ -293,15 +304,10 @@ void handle_photoresistor_sensor(){
 }
 
 void handle_temprature_sensor(){
-  //bmp.readPressure()/100); //displaying the Pressure in hPa, you can change the unit
-  //bmp.readAltitude(1019.66)); //The "1019.66" is the pressure(hPa) at sea level in day in your region
-  int temprature = bmp.readTemperature();
 
-  //Serial.println(temprature);// DEBUG
-
+  float temprature = bmp.readTemperature();
 
   //Serial.print(temprature);// DEBUG
-  //Serial.println("%");// DEBUG
 
   String temprature_str = String(temprature);
   int str_len = temprature_str.length() + 1;
@@ -309,7 +315,7 @@ void handle_temprature_sensor(){
   temprature_str.toCharArray(char_array, str_len);
 
   //publish to mqtt server
-  publish_msg("photoresistor", char_array);
+  publish_msg("temprature", char_array);
   temprature_value = temprature;
 }
 
@@ -415,9 +421,13 @@ void create_html_data_table(WiFiClient* server){
   server->println("<tr><td>לחות</td><td>");
   server->println(soil_moisture_value);
   server->println("%</td></tr>");
+  server->println("<tr><td>טמפרטורה</td><td>");
+  server->println(temprature_value);
+  server->println("C</td></tr>");
   server->println("<tr><td>אור</td><td>");
   server->println(photoresistor_value);
   server->println("%</td></tr></table>");
+  
 
 }
 
@@ -529,11 +539,13 @@ void stand_alone_server_loop(){
 void call_sensors_handlers(){
   handle_soil_moisture_sensor();
   handle_photoresistor_sensor();
+  handle_temprature_sensor();
 }
 
 void setup() {
   Serial.begin(115200);
   servo1.attach(servo_pin);
+  bmp.begin(0x76);
   stand_alone_mode = !setup_wifi();
   client.setServer(mqtt_server, 1883);
   client.setCallback(callback);

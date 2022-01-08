@@ -20,10 +20,12 @@ int angleMin =0;
 int angleMax = 180;
 
 uint64_t uS_TO_S_FACTOR = 1000000;  /* Conversion factor for micro seconds to seconds */
-RTC_DATA_ATTR uint64_t TIME_TO_SLEEP = 10;        /* Time ESP32 will go to sleep (in seconds) */
+
+RTC_DATA_ATTR uint64_t TIME_TO_SLEEP = 60;        /* Time ESP32 will go to sleep (in seconds) */
 int TIME_FOR_STAND_ALONE_SERVER = 600;            /* Time ESP32 of stand alone server (in seconds) */
 RTC_DATA_ATTR int soil_moisture_value = -1;            /* Global moisture percentage value*/
 RTC_DATA_ATTR int photoresistor_value = -1;            /* Global photoresistor percentage value*/
+RTC_DATA_ATTR int battery_percentage = -1;            /* Global battery percentage value*/
 RTC_DATA_ATTR int temprature_value = -100;             /* Global temprature percentage value*/
 
 int take_calibration_measure(int pin, int num_of_samples=10);
@@ -46,6 +48,9 @@ const int soil_moisture_pin = 34;
 
 //Photoresistor Pin (analog pin)
 const int photoresistor_pin = 35;
+
+//Battery monitoring pin
+const int battery_monitor_pin = 39;
 
 // Board id
 const char* board_id = "1";
@@ -255,6 +260,30 @@ void handle_calibration_off(){
   CALIBRATION_MODE = false;
 }
 
+float mapfloat(float x, float in_min, float in_max, float out_min, float out_max)
+{
+  return (x - in_min) * (out_max - out_min) / (in_max - in_min) + out_min;
+}
+
+void handle_battery_level(){
+  int monitor_value = analogRead(battery_monitor_pin);
+  float calibration = 0.2;
+  float voltage = (((monitor_value * 3.3) / 4096 ) * 2) + calibration;
+  battery_percentage = mapfloat(voltage, 3.3, 4.1, 0, 100);
+
+  if(battery_percentage >= 100) battery_percentage = 100;
+  if(battery_percentage < 0) battery_percentage = 0;
+
+  Serial.print("Battery percentage=");
+  Serial.println(battery_percentage);
+
+  String battery_percentage_str = String(battery_percentage);
+  int str_len = battery_percentage_str.length() + 1;
+  char char_array[str_len];
+  battery_percentage_str.toCharArray(char_array, str_len);
+
+  publish_msg("battery_percentage", char_array);
+}
 
 void handle_soil_moisture_sensor(){
   int soil_moisture = analogRead(soil_moisture_pin);
@@ -306,7 +335,6 @@ void handle_photoresistor_sensor(){
 void handle_temprature_sensor(){
 
   float temprature = bmp.readTemperature();
-
   //Serial.print(temprature);// DEBUG
 
   String temprature_str = String(temprature);
@@ -418,6 +446,9 @@ void create_html_data_table(WiFiClient* server){
   call_sensors_handlers();
   server->println("<h2>נתוני חיישנים</h2>");  
   server->println("<table class=\"center\"><tr><th>חיישן</th><th>ערך</th></tr>");
+  server->println("<tr><td>סוללה</td><td>");
+  server->println(battery_percentage);
+  server->println("%</td></tr>");
   server->println("<tr><td>לחות</td><td>");
   server->println(soil_moisture_value);
   server->println("%</td></tr>");
@@ -476,6 +507,7 @@ void stand_alone_server_loop(){
             client.println("<!DOCTYPE html><html>");
             client.println("<html lang=\"he\" dir=\"rtl\">");
             client.println("<head><meta name=\"viewport\" content=\"width=device-width, initial-scale=1\">");
+            client.println("<meta http-equiv='refresh' content='5'/>");
             client.println("<meta charset=\"utf-8\">");
             client.println("<link rel=\"icon\" href=\"data:,\">");
             // CSS to style the on/off buttons
@@ -539,7 +571,14 @@ void stand_alone_server_loop(){
 void call_sensors_handlers(){
   handle_soil_moisture_sensor();
   handle_photoresistor_sensor();
+  handle_battery_level();
   handle_temprature_sensor();
+}
+
+void handle_timeout_comOK(){
+  send_sleep_time();
+  delay(200);
+  publish_msg("comOK", "true");
 }
 
 void setup() {

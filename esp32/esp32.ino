@@ -27,6 +27,7 @@ RTC_DATA_ATTR int soil_moisture_value = -1;            /* Global moisture percen
 RTC_DATA_ATTR int photoresistor_value = -1;            /* Global photoresistor percentage value*/
 RTC_DATA_ATTR int battery_percentage = -1;            /* Global battery percentage value*/
 RTC_DATA_ATTR int temprature_value = -100;             /* Global temprature percentage value*/
+RTC_DATA_ATTR bool low_water_level = false;      /* Global boolean parameter of water level*/
 
 int take_calibration_measure(int pin, int num_of_samples=10);
 
@@ -39,6 +40,9 @@ const char* esp32_ssid     = "server";
 
 // MQTT Broker IP address:
 const char* mqtt_server = "192.168.50.10";
+
+//Water level Pin (analog pin)
+const int water_level_pin = 25;
 
 // Servo Pin
 const int servo_pin = 26;
@@ -329,6 +333,19 @@ void handle_soil_moisture_sensor(){
   soil_moisture_value = soil_moisture_percentage;
 }
 
+void handle_water_height(){
+  int water_height = analogRead(water_level_pin);
+  int water_height_mid = (wet_soil_moisture_value + dry_soil_moisture_value) / 2;
+
+  if(water_height < water_height_mid){
+  low_water_level = true;
+  publish_msg("water_level", "low");
+  } else {
+    low_water_level = false;
+    publish_msg("water_level", "high");
+  }
+}
+
 void handle_photoresistor_sensor(){
   int photoresistor = analogRead(photoresistor_pin);
 
@@ -477,6 +494,13 @@ void create_html_data_table(WiFiClient* server){
   server->println("<tr><td>טמפרטורה</td><td>");
   server->println(temprature_value);
   server->println("C</td></tr>");
+  server->println("<tr><td>נדרש מילוי מיכל מים</td><td>");
+  if(low_water_level){
+    server->println("כן");
+  } else {
+    server->println("לא");
+  }
+  server->println("</td></tr>");
   server->println("<tr><td>אור</td><td>");
   server->println(photoresistor_value);
   server->println("%</td></tr></table>");
@@ -595,6 +619,7 @@ void call_sensors_handlers(){
   handle_photoresistor_sensor();
   handle_battery_level();
   handle_temprature_sensor();
+  handle_water_height();
 }
 
 void handle_timeout_comOK(){

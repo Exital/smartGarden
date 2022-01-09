@@ -333,7 +333,7 @@ void handle_photoresistor_sensor(){
   int photoresistor = analogRead(photoresistor_pin);
 
   //Serial.println(photoresistor);// DEBUG
-  int photoresistor_percentage = map(photoresistor, high_value, low_value, 100, 0);
+  int photoresistor_percentage = map(photoresistor, light_value, dark_value, 100, 0);
 
   //Serial.print(soil_moisture_percentage);// DEBUG
   //Serial.println("%");// DEBUG

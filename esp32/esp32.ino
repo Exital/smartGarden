@@ -6,10 +6,13 @@
 #include <WiFi.h>
 #include <PubSubClient.h>
 #include <Wire.h>
+#include <Adafruit_Sensor.h>
+#include <Adafruit_BMP280.h>
 #include <Servo.h>
 
 Servo servo1;
 
+Adafruit_BMP280 bmp;        /* bmp instance to read bmp values*/
 int angle =0;
 int angleStep = 1;
 
@@ -17,11 +20,14 @@ int angleMin =0;
 int angleMax = 180;
 
 uint64_t uS_TO_S_FACTOR = 1000000;  /* Conversion factor for micro seconds to seconds */
+
 RTC_DATA_ATTR uint64_t TIME_TO_SLEEP = 60;        /* Time ESP32 will go to sleep (in seconds) */
 int TIME_FOR_STAND_ALONE_SERVER = 600;            /* Time ESP32 of stand alone server (in seconds) */
 RTC_DATA_ATTR int soil_moisture_value = -1;            /* Global moisture percentage value*/
 RTC_DATA_ATTR int photoresistor_value = -1;            /* Global photoresistor percentage value*/
 RTC_DATA_ATTR int battery_percentage = -1;            /* Global battery percentage value*/
+RTC_DATA_ATTR int temprature_value = -100;             /* Global temprature percentage value*/
+
 int take_calibration_measure(int pin, int num_of_samples=10);
 
 // Pi network info:
@@ -50,16 +56,16 @@ const int battery_monitor_pin = 39;
 const char* board_id = "1";
 
 // topics to subscribe
-const int subscriptions = 6;
-char *subscribe_to[subscriptions] = {"led", "irigation", "sleep", "calibration", "soil_moisture_calibration", "light_calibration"};
+const int subscriptions = 5;
+char *subscribe_to[subscriptions] = {"led", "irigation", "sleep", "calibration", "soil_moisture_calibration"};
 
 //Moisture values
 RTC_DATA_ATTR int dry_soil_moisture_value = 2500;
 RTC_DATA_ATTR int wet_soil_moisture_value = 1200;
 
 //Photoresistor values
-RTC_DATA_ATTR int dark_value = 3000;
-RTC_DATA_ATTR int light_value = 500;
+RTC_DATA_ATTR int low_value = 3000;
+RTC_DATA_ATTR int high_value = 500;
 
 //Calibration_mode
 bool CALIBRATION_MODE = false;
@@ -196,13 +202,6 @@ void publish_msg(char* local_topic, char* msg){
   strcat(topic,"/");
   strcat(topic,local_topic);
   client.publish(topic, msg);
-  Serial.print("Publishing topic=");
-  Serial.print(topic);
-  Serial.print(" msg=");
-  Serial.println(msg);
-  for(int i = 0; i < 20; i++){
-  client.loop(); //Ensure we've sent & received everything
-  }
 }
 
 void send_sleep_time(){
@@ -256,21 +255,6 @@ void handle_soil_moisture_calibration(String msg){
   }
 }
 
-void handle_light_calibration(String msg){
-  if (msg == "dark"){
-    dark_value = take_calibration_measure(photoresistor_pin);
-    Serial.print("light sensor dark value=");
-    Serial.println(dark_value);
-    publish_msg("light_calibration", "darkOK");
-  }
-  if(msg == "light"){
-    light_value = take_calibration_measure(photoresistor_pin);
-    Serial.print("light sensor light value=");
-    Serial.println(light_value);
-    publish_msg("light_calibration", "lightOK");
-  }
-}
-
 void handle_calibration_off(){
   Serial.println("Calibration mode off");
   CALIBRATION_MODE = false;
@@ -301,14 +285,18 @@ void handle_battery_level(){
   publish_msg("battery_percentage", char_array);
 }
 
-
 void handle_soil_moisture_sensor(){
   int soil_moisture = analogRead(soil_moisture_pin);
   int soil_moisture_percentage = map(soil_moisture, wet_soil_moisture_value, dry_soil_moisture_value, 100, 0);
 
   //Serial.print(soil_moisture_percentage);// DEBUG
   //Serial.println("%");// DEBUG
-
+  if(soil_moisture_percentage < 0){
+    soil_moisture_percentage = 0;
+  }
+  if(soil_moisture_percentage > 100){
+    soil_moisture_percentage = 100;
+  }
   String soil_moisture_percentage_str = String(soil_moisture_percentage);
   int str_len = soil_moisture_percentage_str.length() + 1;
   char char_array[str_len];
@@ -323,10 +311,16 @@ void handle_photoresistor_sensor(){
   int photoresistor = analogRead(photoresistor_pin);
 
   //Serial.println(photoresistor);// DEBUG
-  int photoresistor_percentage = map(photoresistor, light_value, dark_value, 100, 0);
+  int photoresistor_percentage = map(photoresistor, high_value, low_value, 100, 0);
 
   //Serial.print(soil_moisture_percentage);// DEBUG
   //Serial.println("%");// DEBUG
+  if(photoresistor_percentage < 0){
+    photoresistor_percentage = 0;
+  }
+  if(photoresistor_percentage > 100){
+    photoresistor_percentage = 100;
+  }
 
   String photoresistor_percentage_str = String(photoresistor_percentage);
   int str_len = photoresistor_percentage_str.length() + 1;
@@ -336,6 +330,21 @@ void handle_photoresistor_sensor(){
   //publish to mqtt server
   publish_msg("photoresistor", char_array);
   photoresistor_value = photoresistor_percentage;
+}
+
+void handle_temprature_sensor(){
+
+  float temprature = bmp.readTemperature();
+  //Serial.print(temprature);// DEBUG
+
+  String temprature_str = String(temprature);
+  int str_len = temprature_str.length() + 1;
+  char char_array[str_len];
+  temprature_str.toCharArray(char_array, str_len);
+
+  //publish to mqtt server
+  publish_msg("temprature", char_array);
+  temprature_value = temprature;
 }
 
 void handle_irigation(String msg){
@@ -367,7 +376,7 @@ void callback(char* topic, byte* message, unsigned int length) {
   if (local_topic == "sleep") handle_sleep_duration_change(messageTemp);
   if (local_topic == "calibration" && messageTemp == "end") handle_calibration_off();
   if (local_topic == "soil_moisture_calibration") handle_soil_moisture_calibration(messageTemp);
-  if (local_topic == "light_calibration") handle_light_calibration(messageTemp);
+
 }
 
 void reconnect() {
@@ -375,7 +384,7 @@ void reconnect() {
   while (!client.connected()) {
     Serial.print("Attempting MQTT connection...");
     // Attempt to connect
-    if (client.connect(board_id)) {
+    if (client.connect("ESP32Client")) {
       Serial.println("connected");
       // Subscribe
       make_subscriptions();
@@ -443,9 +452,13 @@ void create_html_data_table(WiFiClient* server){
   server->println("<tr><td>לחות</td><td>");
   server->println(soil_moisture_value);
   server->println("%</td></tr>");
+  server->println("<tr><td>טמפרטורה</td><td>");
+  server->println(temprature_value);
+  server->println("C</td></tr>");
   server->println("<tr><td>אור</td><td>");
   server->println(photoresistor_value);
   server->println("%</td></tr></table>");
+  
 
 }
 
@@ -559,6 +572,7 @@ void call_sensors_handlers(){
   handle_soil_moisture_sensor();
   handle_photoresistor_sensor();
   handle_battery_level();
+  handle_temprature_sensor();
 }
 
 void handle_timeout_comOK(){
@@ -570,9 +584,11 @@ void handle_timeout_comOK(){
 void setup() {
   Serial.begin(115200);
   servo1.attach(servo_pin);
+  bmp.begin(0x76);
   stand_alone_mode = !setup_wifi();
   client.setServer(mqtt_server, 1883);
   client.setCallback(callback);
+
   pinMode(servo_pin, OUTPUT);
   pinMode(soil_moisture_pin, INPUT);
   pinMode(photoresistor_pin, INPUT);
@@ -582,16 +598,16 @@ void setup() {
   if (!client.connected() && !stand_alone_mode) {
       reconnect();
   }
-
+  publish_msg("comOK", "true");
 
   handle_wakeup_reason();
   call_sensors_handlers();
 
-  for(int i = 0; i < 20; i++){
+  for(int i = 0; i < 10; i++){
   client.loop(); //Ensure we've sent & received everything
   delay(100);
   }
-  handle_timeout_comOK();
+  send_sleep_time();
   Serial.println("going to sleep");
   ESP.deepSleep(TIME_TO_SLEEP * uS_TO_S_FACTOR);
 }

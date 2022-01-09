@@ -56,16 +56,16 @@ const int battery_monitor_pin = 39;
 const char* board_id = "1";
 
 // topics to subscribe
-const int subscriptions = 5;
-char *subscribe_to[subscriptions] = {"led", "irigation", "sleep", "calibration", "soil_moisture_calibration"};
+const int subscriptions = 6;
+char *subscribe_to[subscriptions] = {"led", "irigation", "sleep", "calibration", "soil_moisture_calibration", "light_calibration"};
 
 //Moisture values
 RTC_DATA_ATTR int dry_soil_moisture_value = 2500;
 RTC_DATA_ATTR int wet_soil_moisture_value = 1200;
 
 //Photoresistor values
-RTC_DATA_ATTR int low_value = 3000;
-RTC_DATA_ATTR int high_value = 500;
+RTC_DATA_ATTR int dark_value = 3000;
+RTC_DATA_ATTR int light_value = 500;
 
 //Calibration_mode
 bool CALIBRATION_MODE = false;
@@ -202,6 +202,13 @@ void publish_msg(char* local_topic, char* msg){
   strcat(topic,"/");
   strcat(topic,local_topic);
   client.publish(topic, msg);
+  Serial.print("Publishing topic=");
+  Serial.print(topic);
+  Serial.print(" msg=");
+  Serial.println(msg);
+  for(int i = 0; i < 20; i++){
+  client.loop(); //Ensure we've sent & received everything
+  }
 }
 
 void send_sleep_time(){
@@ -252,6 +259,21 @@ void handle_soil_moisture_calibration(String msg){
     Serial.print("dry soil moisutre value=");
     Serial.println(dry_soil_moisture_value);
     publish_msg("soil_moisture_calibration", "dryOK");
+  }
+}
+
+void handle_light_calibration(String msg){
+  if (msg == "dark"){
+    dark_value = take_calibration_measure(photoresistor_pin);
+    Serial.print("light sensor dark value=");
+    Serial.println(dark_value);
+    publish_msg("light_calibration", "darkOK");
+  }
+  if(msg == "light"){
+    light_value = take_calibration_measure(photoresistor_pin);
+    Serial.print("light sensor light value=");
+    Serial.println(light_value);
+    publish_msg("light_calibration", "lightOK");
   }
 }
 
@@ -376,7 +398,7 @@ void callback(char* topic, byte* message, unsigned int length) {
   if (local_topic == "sleep") handle_sleep_duration_change(messageTemp);
   if (local_topic == "calibration" && messageTemp == "end") handle_calibration_off();
   if (local_topic == "soil_moisture_calibration") handle_soil_moisture_calibration(messageTemp);
-
+  if (local_topic == "light_calibration") handle_light_calibration(messageTemp);
 }
 
 void reconnect() {
@@ -384,7 +406,7 @@ void reconnect() {
   while (!client.connected()) {
     Serial.print("Attempting MQTT connection...");
     // Attempt to connect
-    if (client.connect("ESP32Client")) {
+    if (client.connect(board_id)) {
       Serial.println("connected");
       // Subscribe
       make_subscriptions();
@@ -598,16 +620,16 @@ void setup() {
   if (!client.connected() && !stand_alone_mode) {
       reconnect();
   }
-  publish_msg("comOK", "true");
+
 
   handle_wakeup_reason();
   call_sensors_handlers();
 
-  for(int i = 0; i < 10; i++){
+  for(int i = 0; i < 20; i++){
   client.loop(); //Ensure we've sent & received everything
   delay(100);
   }
-  send_sleep_time();
+  handle_timeout_comOK();
   Serial.println("going to sleep");
   ESP.deepSleep(TIME_TO_SLEEP * uS_TO_S_FACTOR);
 }

@@ -91,6 +91,7 @@ String header;
 // Auxiliar variables to store the current output state
 String output26State = "off";
 String output27State = "off";
+bool stand_alone_irigation_button = false;
 
 // Assign output variables to GPIO pins
 const int output26 = 26;
@@ -516,7 +517,7 @@ void stand_alone_server_set_up(){
 void create_html_data_table(WiFiClient* server){
 
   call_sensors_handlers();
-  server->println("<h2>נתוני חיישנים</h2>");  
+  server->println("<h2>נתוני חיישנים</h2>");
   server->println("<table class=\"center\"><tr><th>חיישן</th><th>ערך</th></tr>");
   server->println("<tr><td>סוללה</td><td>");
   server->println(battery_percentage);
@@ -537,7 +538,7 @@ void create_html_data_table(WiFiClient* server){
   server->println("<tr><td>אור</td><td>");
   server->println(photoresistor_value);
   server->println("%</td></tr></table>");
-  
+
 
 }
 
@@ -564,13 +565,14 @@ void stand_alone_server_loop(){
             client.println();
 
             // turns the GPIOs on and off
-            if (header.indexOf("GET /26/on") >= 0) {
-              Serial.println("GPIO 26 on");
-              output26State = "on";
+            if (header.indexOf("GET /irigation/on") >= 0) {
+              Serial.println("irigation button clicked - ON");
+              handle_irigation();
+              stand_alone_irigation_button = true;
               digitalWrite(output26, HIGH);
-            } else if (header.indexOf("GET /26/off") >= 0) {
-              Serial.println("GPIO 26 off");
-              output26State = "off";
+            } else if (header.indexOf("GET /irigation/off") >= 0) {
+              Serial.println("irigation button clicked - OFF");
+              stand_alone_irigation_button = false;
               digitalWrite(output26, LOW);
             } else if (header.indexOf("GET /27/on") >= 0) {
               Serial.println("GPIO 27 on");
@@ -604,12 +606,13 @@ void stand_alone_server_loop(){
             client.println("<body><h1>Stand Mode Server</h1>");
 
             // Display current state, and ON/OFF buttons for GPIO 26
-            client.println("<p>GPIO 26 - State " + output26State + "</p>");
+            client.println("<p>השקיה</p>");
             // If the output26State is off, it displays the ON button
-            if (output26State=="off") {
-              client.println("<p><a href=\"/26/on\"><button class=\"button\">ON</button></a></p>");
+            if (!stand_alone_irigation_button) {
+              client.println("<p><a href=\"/irigation/on\"><button class=\"button\">הפעל השקיה</button></a></p>");
             } else {
-              client.println("<p><a href=\"/26/off\"><button class=\"button button2\">OFF</button></a></p>");
+              stand_alone_irigation_button = false;
+              client.println("<p><a href=\"/irigation/off\"><button class=\"button button2\" disabled>פקודה נשלחה</button></a></p>");
             }
 
             // Display current state, and ON/OFF buttons for GPIO 27

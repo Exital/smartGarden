@@ -89,13 +89,7 @@ bool stand_alone_server_timeout = false;
 String header;
 
 // Auxiliar variables to store the current output state
-String output26State = "off";
-String output27State = "off";
 bool stand_alone_irigation_button = false;
-
-// Assign output variables to GPIO pins
-const int output26 = 26;
-const int output27 = 27;
 
 // -------------------------------------------------------------
 
@@ -489,13 +483,6 @@ void loop() {
 }
 
 void stand_alone_server_set_up(){
-  // Initialize the output variables as outputs
-  pinMode(output26, OUTPUT);
-  pinMode(output27, OUTPUT);
-  // Set outputs to LOW
-  digitalWrite(output26, LOW);
-  digitalWrite(output27, LOW);
-
   // Connect to Wi-Fi network with SSID and password
   Serial.print("Setting AP (Access Point)…");
   // TODO: change the esp_ssid to be 'Board<id>_Server' dynamicly using the board_id variable
@@ -561,7 +548,7 @@ void stand_alone_server_loop(){
             // and a content-type so the client knows what's coming, then a blank line:
             client.println("HTTP/1.1 200 OK");
             client.println("Content-type:text/html");
-            client.println("Connection: close");
+            client.println("Connection: keep-alive");
             client.println();
 
             // turns the GPIOs on and off
@@ -569,26 +556,16 @@ void stand_alone_server_loop(){
               Serial.println("irigation button clicked - ON");
               handle_irigation();
               stand_alone_irigation_button = true;
-              digitalWrite(output26, HIGH);
             } else if (header.indexOf("GET /irigation/off") >= 0) {
               Serial.println("irigation button clicked - OFF");
               stand_alone_irigation_button = false;
-              digitalWrite(output26, LOW);
-            } else if (header.indexOf("GET /27/on") >= 0) {
-              Serial.println("GPIO 27 on");
-              output27State = "on";
-              digitalWrite(output27, HIGH);
-            } else if (header.indexOf("GET /27/off") >= 0) {
-              Serial.println("GPIO 27 off");
-              output27State = "off";
-              digitalWrite(output27, LOW);
             }
 
             // Display the HTML web page
             client.println("<!DOCTYPE html><html>");
             client.println("<html lang=\"he\" dir=\"rtl\">");
             client.println("<head><meta name=\"viewport\" content=\"width=device-width, initial-scale=1\">");
-            client.println("<meta http-equiv='refresh' content='5'/>");
+            client.println("<meta http-equiv='refresh' content=\"10; url=http://192.168.4.1\"/>");
             client.println("<meta charset=\"utf-8\">");
             client.println("<link rel=\"icon\" href=\"data:,\">");
             // CSS to style the on/off buttons
@@ -603,29 +580,15 @@ void stand_alone_server_loop(){
 
 
             // Web Page Heading
-            client.println("<body><h1>Stand Mode Server</h1>");
+            client.println("<body><h1>Stand Alone Server</h1>");
 
-            // Display current state, and ON/OFF buttons for GPIO 26
-            client.println("<p>השקיה</p>");
-            // If the output26State is off, it displays the ON button
+            // Display irigation button
             if (!stand_alone_irigation_button) {
               client.println("<p><a href=\"/irigation/on\"><button class=\"button\">הפעל השקיה</button></a></p>");
             } else {
               stand_alone_irigation_button = false;
-              client.println("<p><a href=\"/irigation/off\"><button class=\"button button2\" disabled>פקודה נשלחה</button></a></p>");
+              client.println("<p><a href=\"/irigation/off\"><button class=\"button button2\">פקודה נשלחה</button></a></p>");
             }
-
-            // Display current state, and ON/OFF buttons for GPIO 27
-            client.println("<p>GPIO 27 - State " + output27State + "</p>");
-            // If the output27State is off, it displays the ON button
-            if (output27State=="off") {
-              client.println("<p><a href=\"/27/on\"><button class=\"button\">ON</button></a></p>");
-            } else {
-              client.println("<p><a href=\"/27/off\"><button class=\"button button2\">OFF</button></a></p>");
-            }
-            //client.println("<p>sleep time out ");
-            //client.println(TIME_FOR_STAND_ALONE_SERVER);
-            //client.println("</p>");
             create_html_data_table(&client);
             client.println("</body></html>");
 

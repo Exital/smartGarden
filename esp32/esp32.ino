@@ -10,14 +10,13 @@
 #include <Adafruit_BMP280.h>
 #include <Servo.h>
 
-Servo servo1;
+Servo servo_valve;
+
+enum ValveState {CLOSED = 0, OPEN = 1};
+int lower_irigation_bound = 30;         /* Lowest soil moisture percentage that plants need to thrive */
+int upper_irigation_bound = 50;         /* Highest soil moisture percentage that plants need to thrive */
 
 Adafruit_BMP280 bmp;        /* bmp instance to read bmp values*/
-int angle =0;
-int angleStep = 1;
-
-int angleMin =0;
-int angleMax = 180;
 
 uint64_t uS_TO_S_FACTOR = 1000000;  /* Conversion factor for micro seconds to seconds */
 
@@ -73,6 +72,9 @@ RTC_DATA_ATTR int light_value = 500;
 
 //Calibration_mode
 bool CALIBRATION_MODE = false;
+
+//Servo valve state
+RTC_DATA_ATTR ValveState valve_state = CLOSED;
 
 WiFiClient espClient;
 PubSubClient client(espClient);
@@ -386,12 +388,28 @@ void handle_temprature_sensor(){
   temprature_value = temprature;
 }
 
-void handle_irigation(String msg){
-  if(msg == "true"){
-    Serial.println("irigation started");
-    servo_move();
-    publish_msg("irigationOK", "false");
-    Serial.println("irigation ended");
+void handle_irigation(){
+  if(!low_water_level){
+    if (valve_state == CLOSED){
+      Serial.println("manual irigation started");
+      open_close_valve();
+      Serial.println("manual irigation ended");
+    }
+    publish_msg("irigationOK", "true");
+  } else {
+      publish_msg("irigationOK", "false");
+  }
+}
+
+void auto_irigation(){
+  if(!low_water_level){
+    if (valve_state == CLOSED){
+      Serial.println("Auto irigation started");
+      if (soil_moisture_value < lower_irigation_bound) open_valve();
+    } else {
+      if (soil_moisture_value > upper_irigation_bound) close_valve();
+      Serial.println("Auto irigation ended");
+    }
   }
 }
 
@@ -411,7 +429,7 @@ void callback(char* topic, byte* message, unsigned int length) {
   // removing board/<id>/ from topic
   topic = &topic[8];
   String local_topic = String(topic);
-  if (local_topic == "irigation") handle_irigation(messageTemp);
+  if (local_topic == "irigation" && messageTemp == "true") handle_irigation();
   if (local_topic == "sleep") handle_sleep_duration_change(messageTemp);
   if (local_topic == "calibration" && messageTemp == "end") handle_calibration_off();
   if (local_topic == "soil_moisture_calibration") handle_soil_moisture_calibration(messageTemp);
@@ -437,17 +455,32 @@ void reconnect() {
   }
 }
 
-void servo_move(){
-    for(int angle = 0; angle <= angleMax; angle +=angleStep) {
-      servo1.write(angle);
-      delay(20);
-  }
-  delay(2000);
+void open_valve(){
+  int valve_close_angle = 0;
+  int valve_open_angle = 180;
 
-  for(int angle = 180; angle >= angleMin; angle -=angleStep) {
-      servo1.write(angle);
-      delay(20);
+  for(int angle = valve_close_angle; angle <= valve_open_angle; angle +=1) {
+    servo_valve.write(angle);
+    delay(20);
   }
+  valve_state = OPEN;
+}
+
+void close_valve(){
+  int valve_close_angle = 0;
+  int valve_open_angle = 180;
+
+  for(int angle = valve_open_angle; angle >= valve_close_angle; angle -=1) {
+    servo_valve.write(angle);
+    delay(20);
+  }
+  valve_state = CLOSED;
+}
+
+void open_close_valve(){
+  open_valve();
+  delay(2000);
+  close_valve();
 }
 
 void loop() {
@@ -620,6 +653,7 @@ void call_sensors_handlers(){
   handle_battery_level();
   handle_temprature_sensor();
   handle_water_height();
+  auto_irigation();
 }
 
 void handle_timeout_comOK(){
@@ -630,7 +664,7 @@ void handle_timeout_comOK(){
 
 void setup() {
   Serial.begin(115200);
-  servo1.attach(servo_pin);
+  servo_valve.attach(servo_pin);
   bmp.begin(0x76);
   stand_alone_mode = !setup_wifi();
   client.setServer(mqtt_server, 1883);
@@ -645,7 +679,6 @@ void setup() {
   if (!client.connected() && !stand_alone_mode) {
       reconnect();
   }
-
 
   handle_wakeup_reason();
   call_sensors_handlers();

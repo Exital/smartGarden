@@ -18,7 +18,7 @@
 
 
 
-### Install dependencies
+## Install dependencies
 
 > Open the `arduino IDE` -> Tools -> Manage Libraries and install the following:
 - WIFI

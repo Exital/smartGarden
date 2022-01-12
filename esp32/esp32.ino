@@ -405,6 +405,8 @@ void auto_irigation(){
       if (soil_moisture_value > upper_irigation_bound) close_valve();
       Serial.println("Auto irigation ended");
     }
+  } else {
+    if (valve_state == OPEN) close_valve();
   }
 }
 

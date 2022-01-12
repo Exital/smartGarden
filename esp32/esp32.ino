@@ -362,9 +362,11 @@ float mapfloat(float x, float in_min, float in_max, float out_min, float out_max
 // Handles battery level
 void handle_battery_level(){
   int monitor_value = analogRead(battery_monitor_pin);
-  float calibration = 0.2;
+  float calibration = 0.3;
   float voltage = (((monitor_value * 3.3) / 4096 ) * 2) + calibration;
-  battery_percentage = mapfloat(voltage, 3.3, 4.1, 0, 100);
+  Serial.print("voltage=");
+  Serial.println(voltage);
+  battery_percentage = mapfloat(voltage, 3.2, 4.1, 0, 100);
 
   if(battery_percentage >= 100) battery_percentage = 100;
   if(battery_percentage < 0) battery_percentage = 0;
@@ -484,7 +486,9 @@ void auto_irigation(){
       if (soil_moisture_value < lower_irigation_bound) open_valve();
     } else {
       if (soil_moisture_value > upper_irigation_bound) close_valve();
-    }
+      }
+    } else {
+        if (valve_state == OPEN) close_valve();
   }
 }
 
@@ -500,28 +504,32 @@ void call_sensors_handlers(){
 
 // Open irrigation valve
 void open_valve(){
-  int valve_close_angle = 0;
-  int valve_open_angle = 180;
-  Serial.println("Servo valve opening");
-
-  for(int angle = valve_close_angle; angle <= valve_open_angle; angle +=1) {
-    servo_valve.write(angle);
-    delay(20);
+  if(valve_state == CLOSED){
+    int valve_close_angle = 0;
+    int valve_open_angle = 180;
+    Serial.println("Servo valve opening");
+  
+    for(int angle = valve_close_angle; angle <= valve_open_angle; angle +=1) {
+      servo_valve.write(angle);
+      delay(20);
+    }
   }
   valve_state = OPEN;
 }
 
 //Close irrigation valve
 void close_valve(){
-  int valve_close_angle = 0;
-  int valve_open_angle = 180;
-  Serial.println("Servo valve closing");
-
-  for(int angle = valve_open_angle; angle >= valve_close_angle; angle -=1) {
-    servo_valve.write(angle);
-    delay(20);
+  if(valve_state == OPEN){
+    int valve_close_angle = 0;
+    int valve_open_angle = 180;
+    Serial.println("Servo valve closing");
+  
+    for(int angle = valve_open_angle; angle >= valve_close_angle; angle -=1) {
+      servo_valve.write(angle);
+      delay(20);
+    }
+    valve_state = CLOSED;
   }
-  valve_state = CLOSED;
 }
 
 //Helper for manual irrigation

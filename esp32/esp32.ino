@@ -17,31 +17,31 @@ const char* board_id = "1";
 Servo servo_valve;
 
 // bmp instance to read bmp values
-Adafruit_BMP280 bmp;  
-      
-// Enum for valve state
-enum ValveState {CLOSED = 0, OPEN = 1}; 
+Adafruit_BMP280 bmp;
 
-// Conversion factor for micro seconds to seconds 
-uint64_t uS_TO_S_FACTOR = 1000000; 
+// Enum for valve state
+enum ValveState {CLOSED = 0, OPEN = 1};
+
+// Conversion factor for micro seconds to seconds
+const uint64_t uS_TO_S_FACTOR = 1000000;
 
 int take_calibration_measure(int pin, int num_of_samples=10);
 
- 
- 
+
+
 // ------------------------ default values -----------------
 
-// Lowest soil moisture percentage that plants need to thrive 
-int lower_irigation_bound = 30;    
-     
-// Highest soil moisture percentage that plants need to thrive 
-int upper_irigation_bound = 50;  
-       
-// Sleep time for ESP32 (in seconds) 
-RTC_DATA_ATTR uint64_t TIME_TO_SLEEP = 60; 
-       
-// Sleep time for ESP32 of stand alone server (in seconds)
-int TIME_FOR_STAND_ALONE_SERVER = 600;  
+// Lowest soil moisture percentage that plants need to thrive
+const int lower_irigation_bound = 30;
+
+// Highest soil moisture percentage that plants need to thrive
+const int upper_irigation_bound = 50;
+
+// Sleep time for ESP32 (in seconds)
+RTC_DATA_ATTR uint64_t TIME_TO_SLEEP = 60;
+
+// Timer for ESP32 stand alone server (in seconds) before returning to sleep cycle
+const int TIME_FOR_STAND_ALONE_SERVER = 600;
 
 //Servo valve state(savd to rtc data attr to kepp the vlues while sleeping)
 RTC_DATA_ATTR ValveState valve_state = CLOSED;
@@ -55,27 +55,27 @@ bool CALIBRATION_MODE = false;
 // ------------------------ default sensors values -----------------
 
 // Global moisture percentage value(savd to rtc data attr to keep the vlues while sleeping)
-RTC_DATA_ATTR int soil_moisture_value = -1;   
+RTC_DATA_ATTR int soil_moisture_value = -1;
 
-// Global photoresistor percentage value(savd to rtc data attr to keep the values while sleeping)        
-RTC_DATA_ATTR int photoresistor_value = -1;   
+// Global photoresistor percentage value(savd to rtc data attr to keep the values while sleeping)
+RTC_DATA_ATTR int photoresistor_value = -1;
 
-// Global battery percentage value(savd to rtc data attr to keep the values while sleeping)         
+// Global battery percentage value(savd to rtc data attr to keep the values while sleeping)
 RTC_DATA_ATTR int battery_percentage = -1;
 
-// Global temprature percentage value(savd to rtc data attr to keep the values while sleeping)           
-RTC_DATA_ATTR int temprature_value = -100; 
+// Global temprature percentage value(savd to rtc data attr to keep the values while sleeping)
+RTC_DATA_ATTR int temprature_value = -100;
 
-// Global boolean parameter of water level(savd to rtc data attr to keep the values while sleeping)          
-RTC_DATA_ATTR bool low_water_level = false;     
+// Global boolean parameter of water level(savd to rtc data attr to keep the values while sleeping)
+RTC_DATA_ATTR bool low_water_level = false;
 
 //Moisture values(savd to rtc data attr to keep the values while sleeping)
-RTC_DATA_ATTR int dry_soil_moisture_value = 2500;
-RTC_DATA_ATTR int wet_soil_moisture_value = 1200;
+RTC_DATA_ATTR int dry_soil_moisture_value = 4095;
+RTC_DATA_ATTR int wet_soil_moisture_value = 1650;
 
 //Photoresistor values(savd to rtc data attr to keep the values while sleeping)
-RTC_DATA_ATTR int dark_value = 3000;
-RTC_DATA_ATTR int light_value = 500;
+RTC_DATA_ATTR int dark_value = 4095;
+RTC_DATA_ATTR int light_value = 1850;
 
 // -------------------------------------------------------------
 
@@ -108,7 +108,7 @@ char *subscribe_to[subscriptions] = {"led", "irigation", "sleep", "calibration",
 // Servo Pin
 const int servo_pin = 26;
 
-//Water level Pin 
+//Water level Pin
 const int water_level_pin = 32;
 
 //Button Pin GPIO_NUM_33
@@ -116,7 +116,7 @@ const int water_level_pin = 32;
 //Soil moisture Pin
 const int soil_moisture_pin = 34;
 
-//Photoresistor Pin 
+//Photoresistor Pin
 const int photoresistor_pin = 35;
 
 //Battery monitoring pin
@@ -131,7 +131,7 @@ const int battery_monitor_pin = 39;
 // ------------------------ stand alone server -----------------
 // Set web server port number to 80
 WiFiServer server(80);
- 
+
 //Set stand alone mode to false(savd to rtc data attr to kepp the vlues while sleeping)
 RTC_DATA_ATTR bool stand_alone_mode = false;
 
@@ -145,9 +145,6 @@ String header;
 bool stand_alone_irigation_button = false;
 
 // -------------------------------------------------------------
-
-
-
 
 //Handles wakeup reason of ESP32 after waking up
 void handle_wakeup_reason(){
@@ -173,9 +170,9 @@ void IRAM_ATTR onTimer(){
 void handle_external_wake_up(){
   if (stand_alone_mode){
     stand_alone_server_set_up();
-	
-  // Use 1st timer of 4 
-  // 1 tick take 1/(80MHZ/80) = 1us so we set divider 80 and count up 
+
+  // Use 1st timer of 4
+  // 1 tick take 1/(80MHZ/80) = 1us so we set divider 80 and count up
   hw_timer_t * timer = NULL;
   timer = timerBegin(0, 80, true);
 
@@ -183,11 +180,11 @@ void handle_external_wake_up(){
   timerAttachInterrupt(timer, &onTimer, true);
 
   // Set alarm to call onTimer function every second 1 tick is 1us
-  //=> 1 second is 1000000us 
+  //=> 1 second is 1000000us
   // Repeat the alarm (third parameter)
   timerAlarmWrite(timer, uS_TO_S_FACTOR * TIME_FOR_STAND_ALONE_SERVER, false);
 
-  // Start an alarm 
+  // Start an alarm
   timerAlarmEnable(timer);
   Serial.println("start timer");
     while(!stand_alone_server_timeout){
@@ -200,7 +197,7 @@ void handle_external_wake_up(){
   }
 }
 
-//Enter calibration mode after external wake up 
+//Enter calibration mode after external wake up
 void calibration_mode() {
   Serial.println("Wakeup caused by external signal using RTC_IO");
   Serial.println("Going in calibration mode");
@@ -212,11 +209,10 @@ void calibration_mode() {
 }
 
 
-
 // Set up wifi
 bool setup_wifi() {
   delay(10);
-  
+
   // We start by connecting to a WiFi network
   Serial.println();
   Serial.print("Connecting to ");
@@ -233,11 +229,11 @@ bool setup_wifi() {
   }
 
 
-  if (WiFi.status() != WL_CONNECTED){  // Pi Wifi not found 
+  if (WiFi.status() != WL_CONNECTED){  // Pi Wifi not found
     Serial.println("");
     Serial.println("Pi Wifi not found - stand alone mode initiating...");
     return false;
-  } else {// Pi Wifi found 
+  } else {// Pi Wifi found
     Serial.println("");
     Serial.println("WiFi connected");
     Serial.println("IP address: ");
@@ -246,7 +242,7 @@ bool setup_wifi() {
   }
 }
 
-//Board subscription 
+//Board subscription
 void make_subscriptions(){
     for (int i = 0; i < subscriptions; i++) {
       char topic[256];
@@ -310,7 +306,7 @@ void handle_sleep_duration_change(String msg){
 
 // Mesures caibration valuse
 int take_calibration_measure(int pin, int num_of_samples){
-  delay(100);
+  delay(1000);
   int result = 0;
   for(int i = 0; i < num_of_samples; i++){
     result += analogRead(pin);
@@ -376,7 +372,7 @@ void handle_battery_level(){
   Serial.print("Battery percentage=");
   Serial.println(battery_percentage);
 
-  // Adjust string for publish messege 
+  // Adjust string for publish messege
   String battery_percentage_str = String(battery_percentage);
   int str_len = battery_percentage_str.length() + 1;
   char char_array[str_len];
@@ -390,17 +386,15 @@ void handle_battery_level(){
 void handle_soil_moisture_sensor(){
   int soil_moisture = analogRead(soil_moisture_pin);
   int soil_moisture_percentage = map(soil_moisture, wet_soil_moisture_value, dry_soil_moisture_value, 100, 0);
- 
-  //Serial.print(soil_moisture_percentage);// DEBUG
-  //Serial.println("%");// DEBUG
+
   if(soil_moisture_percentage < 0){
     soil_moisture_percentage = 0;
   }
   if(soil_moisture_percentage > 100){
     soil_moisture_percentage = 100;
   }
-  
-  // Adjust string for publish messege 
+
+  // Adjust string for publish messege
   String soil_moisture_percentage_str = String(soil_moisture_percentage);
   int str_len = soil_moisture_percentage_str.length() + 1;
   char char_array[str_len];
@@ -416,7 +410,7 @@ void handle_soil_moisture_sensor(){
 void handle_water_height(){
   int water_height = analogRead(water_level_pin);
   int water_height_mid = (wet_soil_moisture_value + dry_soil_moisture_value) / 2;
-  if(water_height < water_height_mid){
+  if(water_height > water_height_mid){
   low_water_level = true;
   publish_msg("water_level", "low");
   } else {
@@ -441,7 +435,7 @@ void handle_photoresistor_sensor(){
     photoresistor_percentage = 100;
   }
 
-  // Adjust string for publish messege 
+  // Adjust string for publish messege
   String photoresistor_percentage_str = String(photoresistor_percentage);
   int str_len = photoresistor_percentage_str.length() + 1;
   char char_array[str_len];
@@ -458,7 +452,7 @@ void handle_temprature_sensor(){
   float temprature = bmp.readTemperature();
   //Serial.print(temprature);// DEBUG
 
-  // Adjust string for publish messege 
+  // Adjust string for publish messege
   String temprature_str = String(temprature);
   int str_len = temprature_str.length() + 1;
   char char_array[str_len];
@@ -487,16 +481,14 @@ void handle_irigation(){
 void auto_irigation(){
   if(!low_water_level){
     if (valve_state == CLOSED){
-      Serial.println("Auto irigation started");
       if (soil_moisture_value < lower_irigation_bound) open_valve();
     } else {
       if (soil_moisture_value > upper_irigation_bound) close_valve();
-      Serial.println("Auto irigation ended");
     }
   }
 }
 
-//Cals all sensor handlers 
+//Cals all sensor handlers
 void call_sensors_handlers(){
   handle_soil_moisture_sensor();
   handle_photoresistor_sensor();
@@ -510,6 +502,7 @@ void call_sensors_handlers(){
 void open_valve(){
   int valve_close_angle = 0;
   int valve_open_angle = 180;
+  Serial.println("Servo valve opening");
 
   for(int angle = valve_close_angle; angle <= valve_open_angle; angle +=1) {
     servo_valve.write(angle);
@@ -522,6 +515,7 @@ void open_valve(){
 void close_valve(){
   int valve_close_angle = 0;
   int valve_open_angle = 180;
+  Serial.println("Servo valve closing");
 
   for(int angle = valve_open_angle; angle >= valve_close_angle; angle -=1) {
     servo_valve.write(angle);
@@ -537,17 +531,16 @@ void open_close_valve(){
   close_valve();
 }
 
-//Handles timeout
+//Handles connection timeout
 void handle_timeout_comOK(){
   send_sleep_time();
   delay(200);
   publish_msg("comOK", "true");
 }
 
-
-// TODO ADD DESCROPTION
+// this is the entry point of a received topic and message for board_id
 void callback(char* topic, byte* message, unsigned int length) {
-	
+
   // print what topic and message have arrived to serial
   Serial.print("Message arrived on topic: ");
   Serial.print(topic);
@@ -591,16 +584,15 @@ void reconnect() {
   }
 }
 
-// Loop function
+// Loop function - empty since the ESP32 never gets here because of the deepSleep cycle
 void loop() {
 
 }
 
-// Set up for stnd alone
+// Set up for stand alone
 void stand_alone_server_set_up(){
   // Connect to Wi-Fi network with SSID and password
   Serial.print("Setting AP (Access Point)…");
-  // TODO: change the esp_ssid to be 'Board<id>_Server' dynamicly using the board_id variable
   char server_name[256];
   const char *board = "Board_";
   strcpy(server_name,board);
@@ -615,11 +607,11 @@ void stand_alone_server_set_up(){
   server.begin();
 }
 
-// Creates the stand alone html sensor values table 
+// Creates the stand alone html sensor values table
 void create_html_data_table(WiFiClient* server){
 
   call_sensors_handlers();
-  
+
   //create the table
   server->println("<h2>נתוני חיישנים</h2>");
   server->println("<table class=\"center\"><tr><th>חיישן</th><th>ערך</th></tr>");
@@ -646,7 +638,7 @@ void create_html_data_table(WiFiClient* server){
 
 }
 
-// Stand alone server handler 
+// Stand alone server handler
 void stand_alone_server_loop(){
   WiFiClient client = server.available();   // Listen for incoming clients
 
@@ -707,7 +699,7 @@ void stand_alone_server_loop(){
               stand_alone_irigation_button = false;
               client.println("<p><a href=\"/irigation/off\"><button class=\"button button2\">פקודה נשלחה</button></a></p>");
             }
-			
+
 			//Create the html table
             create_html_data_table(&client);
             client.println("</body></html>");
@@ -736,31 +728,26 @@ void stand_alone_server_loop(){
 
 // System setup
 void setup() {
-  // set serial port to be 115200
+  // set serial port to be 115200 baud rate
   Serial.begin(115200);
-  
+
   //attach servo pin
   servo_valve.attach(servo_pin);
-  
-  // set bmp(temprature) sensor
+
+  // set bmp(temprature) sensor (0x76=default i2c address)
   bmp.begin(0x76);
-  
+
   //set stand alone mode
   stand_alone_mode = !setup_wifi();
-  
+
   //set mqtt server
   client.setServer(mqtt_server, 1883);
   client.setCallback(callback);
 
-  //set sensors pins mode
-  pinMode(servo_pin, OUTPUT);
-  pinMode(soil_moisture_pin, INPUT);
-  pinMode(photoresistor_pin, INPUT);
-  
   Serial.println("woke up");
   esp_sleep_enable_ext0_wakeup(GPIO_NUM_33,1); //1 = High, 0 = Low
 
-  if (!client.connected() && !stand_alone_mode) { // in case no client connected and we are 
+  if (!client.connected() && !stand_alone_mode) { // in case no client connected and we are
 												  //not in stand alone mode try to reconnect
       reconnect();
   }

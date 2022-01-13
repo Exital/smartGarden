@@ -16,7 +16,20 @@
 - [Photoresistor sensor](https://he.aliexpress.com/item/32701608104.html?spm=a2g0o.productlist.0.0.4df8270eD0duhN&algo_pvid=e78bfb57-1136-402b-b3fc-9357bea1112a&algo_exp_id=e78bfb57-1136-402b-b3fc-9357bea1112a-7&pdp_ext_f=%7B%22sku_id%22%3A%2260696331493%22%7D&pdp_pi=-1%3B0.68%3B-1%3B-1%40salePrice%3BUSD%3Bsearch-mainSearch) - used to monitor the environment's lighting situation.
 - [Battery](https://he.aliexpress.com/item/1005003229199497.html?spm=a2g0o.productlist.0.0.50a353ddhxWx6U&algo_pvid=02276440-738b-4b65-a0ba-6420fbd68675&aem_p4p_detail=20220111111800788025246049380079564831&algo_exp_id=02276440-738b-4b65-a0ba-6420fbd68675-49&pdp_ext_f=%7B%22sku_id%22%3A%2212000024859221512%22%7D&pdp_pi=-1%3B7.56%3B-1%3BUSD+3.16%40salePrice%3BUSD%3Bsearch-mainSearch) - power source converted to 5v using a battery case.
 
+## Raspberry PI Image
 
+- [IMG link](www.google.com) - burn this image to a SD card using the raspberry PI imager tool and have everything set up for the project.
+- pi's hostname: raspberrypi
+- root user name: pi
+- root password: 1234
+- Access point SSID - SmartGarden
+- Access point password - technioniot
+
+> In order to connect the pi via ssh use:
+```sh
+# use that ssh command following the root's password
+ssh pi@raspberrypi.local
+```
 
 ## Install dependencies
 

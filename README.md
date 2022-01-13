@@ -18,7 +18,7 @@
 
 ## Raspberry PI Image
 
-- [IMG link](www.google.com) - burn this image to a SD card using the raspberry PI imager tool and have everything set up for the project.
+- [IMG link](www.google.com) - burn this image to a SD card using the [raspberry PI imager](https://www.raspberrypi.com/software/) and have everything set up for you.
 - pi's hostname: raspberrypi
 - root user name: pi
 - root password: 1234
@@ -27,14 +27,13 @@
 
 > In order to connect the pi via ssh use:
 ```sh
-# use that ssh command following the root's password
+# use that ssh command followed by the root's password
 ssh pi@raspberrypi.local
 ```
 
 ## Install dependencies
 
 > Open the `arduino IDE` -> Tools -> Manage Libraries and install the following:
-- WIFI
 - Adafruit BMP280 Library
 - PubSubClient
 - ServoESP32

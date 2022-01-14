@@ -37,3 +37,11 @@ ssh pi@raspberrypi.local
 - Adafruit BMP280 Library
 - PubSubClient
 - ServoESP32
+
+## How to use the node red server
+
+1. Connect the RaspberryPI and the esp32 to a power source.
+2. Connect to the RaspberryPI access point:
+  - SSID: `SmartGarden`
+  - Password: `technioniot`
+3. Using a browser go to `raspberrypi.local:1880/ui`.

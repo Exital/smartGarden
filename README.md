@@ -28,7 +28,7 @@
 > In order to connect the pi via ssh use:
 ```sh
 # use that ssh command followed by the root's password
-ssh pi@raspberrypi.local
+ssh pi@192.168.50.10
 ```
 
 ## Install dependencies
@@ -44,4 +44,4 @@ ssh pi@raspberrypi.local
 2. Connect to the RaspberryPI access point:
   - SSID: `SmartGarden`
   - Password: `technioniot`
-3. Using a browser go to `raspberrypi.local:1880/ui`.
+3. Using a browser go to `192.168.50.10:1880/ui`.

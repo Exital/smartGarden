@@ -18,7 +18,7 @@
 
 ## Raspberry PI Image
 
-- [IMG link](https://drive.google.com/file/d/1EEAFZlODesC4fSLV6dXyoCciDNEGbSRv/view?usp=sharing) - burn this image to a SD card using the [raspberry PI imager](https://www.raspberrypi.com/software/) and have everything set up for you.
+- [IMG link](https://drive.google.com/file/d/1eYRfvZBX7p9d9wsQSzMXnRNSS-3lbNKH/view?usp=sharing) - burn this image to a SD card using the [raspberry PI imager](https://www.raspberrypi.com/software/) and have everything set up for you.
 - pi's hostname: raspberrypi
 - root user name: pi
 - root password: 1234

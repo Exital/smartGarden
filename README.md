@@ -6,6 +6,19 @@
 
 [Demo Video](https://www.youtube.com/watch?v=yvWwVqaM3DU) - check out our demo video on `Youtube`.
 
+## Main features
+
+- Endpoint units based on `ESP32` capable of **monitoring** temperature, light and soil moisture.
+- Endpoint are **energy efficient** using `deep sleep` with changeable sleep durations.
+- Endpoint communicate with a main `RPI server`, sends data and receive commands.
+- Main server is capable of controlling **up-to 6** endpoint units.
+- Easy sensors **calibration** via the main server.
+- **Manual irrigation** command can be send to each endpoint unit.
+- Endpoints **automatically** start and finish **irrigation** considering the data from the sensors.
+- **Water levels** are monitored for each endpoint and displayed on the main server.
+- The system operates on **local network** - no need for internet connection.
+- Endpoint units which are not in range of the main server's `WIFI`, can launch **their own local network and server** for visualizing data and sending commands.
+
 ## Documentation
 > We have included `hebrew` documentation for the project in 2 levels:
 - [User guide](broken_link) - a basic manual for operation and basic problem solving.

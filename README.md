@@ -4,6 +4,13 @@
 
 [node-red project](https://github.com/Exital/SmartGardenPI_nodered) - This is the repo for the node-red project.
 
+[Demo Video](https://www.youtube.com/watch?v=yvWwVqaM3DU) - check out our demo video on `Youtube`.
+
+## Documentation
+> We have included `hebrew` documentation for the project in 2 levels:
+- [User guide](broken_link) - a basic manual for operation and basic problem solving.
+- [IT guide](broken_link) - a more advanced manual, with added value for developers.
+
 ## Hardware
 
 - [Raspberrypi 3 model b+](https://www.raspberrypi.com/products/raspberry-pi-3-model-b-plus/) -  used as a local node red server to control all units.

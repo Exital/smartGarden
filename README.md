@@ -2,7 +2,7 @@
 
 [SmartGarden](https://github.com/Exital/smartGarden) is an IoT gardening system consisting of endpoints which monitors soil moisture and temperature of the environment, and an RPI-based central server that displays the data and allows running irrigation and calibration commands to each of the endpoints.
 
-[node-red project](https://github.com/Exital/SmartGardenPI_nodered) - This is the repo for the node-red project.
+[Node-Red project](https://github.com/Exital/SmartGardenPI_nodered) - This is the repo for the node-red project.
 
 [Demo Video](https://www.youtube.com/watch?v=yvWwVqaM3DU) - check out our demo video on `Youtube`.
 

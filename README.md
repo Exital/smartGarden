@@ -16,14 +16,14 @@
 - **Manual irrigation** command can be sent to each endpoint unit.
 - Endpoints **automatically** begins and ends **irrigation** considering the data from the sensors.
 - **Water levels** are monitored for each endpoint and displayed on the main server.
-- The system operates on **local network** - a generated `WIFI hotspot` by the `RPI` - no need for internet connection.
+- The system operates on **local network** generated using `WIFI hotspot` by the `RPI` - thus the system is supported without the need for an internet connection.
 - Endpoint units which are not in range of the main server's `WIFI`, can launch **their own local network and server** for visualizing data and sending commands.
 - Connecting the `RPI` to the internet via it's `LAN port` will create a hotspot with connection to the global internet, the system will continue to operate while the hotspot can be utilized for other purposes.
 
 ## Documentation
 > We have included `hebrew` documentation for the project in 2 levels:
-- [User guide](broken_link) - a basic manual for operation and basic problem solving.
-- [IT guide](broken_link) - a more advanced manual, with added value for developers.
+- [User guide](https://github.com/Exital/smartGarden/blob/master/docs/User_guide.pdf) - a basic manual for operation and basic problem solving.
+- [IT guide](https://github.com/Exital/smartGarden/blob/master/docs/IT_guide.pdf) - a more advanced manual, with added value for developers.
 
 ## Hardware
 

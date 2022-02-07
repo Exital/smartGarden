@@ -22,8 +22,8 @@ Adafruit_BMP280 bmp;
 // Enum for valve state
 enum ValveState {CLOSED = 0, OPEN = 1};
 
-// Conversion factor for micro seconds to seconds
-const uint64_t uS_TO_S_FACTOR = 1000000;
+// Conversion factor for micro seconds to minutes
+const uint64_t uS_TO_min_FACTOR = 1000000 * 60;
 
 int take_calibration_measure(int pin, int num_of_samples=10);
 
@@ -37,11 +37,11 @@ const int lower_irigation_bound = 30;
 // Highest soil moisture percentage that plants need to thrive
 const int upper_irigation_bound = 50;
 
-// Sleep time for ESP32 (in seconds)
+// Sleep time for ESP32 (in minutes)
 RTC_DATA_ATTR uint64_t TIME_TO_SLEEP = 60;
 
-// Timer for ESP32 stand alone server (in seconds) before returning to sleep cycle
-const int TIME_FOR_STAND_ALONE_SERVER = 600;
+// Timer for ESP32 stand alone server (in minutes) before returning to sleep cycle
+const int TIME_FOR_STAND_ALONE_SERVER = 10;
 
 //Servo valve state(savd to rtc data attr to kepp the vlues while sleeping)
 RTC_DATA_ATTR ValveState valve_state = CLOSED;
@@ -182,7 +182,7 @@ void handle_external_wake_up(){
   // Set alarm to call onTimer function every second 1 tick is 1us
   //=> 1 second is 1000000us
   // Repeat the alarm (third parameter)
-  timerAlarmWrite(timer, uS_TO_S_FACTOR * TIME_FOR_STAND_ALONE_SERVER, false);
+  timerAlarmWrite(timer, uS_TO_min_FACTOR * TIME_FOR_STAND_ALONE_SERVER, false);
 
   // Start an alarm
   timerAlarmEnable(timer);
@@ -191,7 +191,7 @@ void handle_external_wake_up(){
       stand_alone_server_loop();
     }
     Serial.println("going to sleep");
-    ESP.deepSleep(TIME_TO_SLEEP * uS_TO_S_FACTOR);
+    ESP.deepSleep(TIME_TO_SLEEP * uS_TO_min_FACTOR);
   } else {
     calibration_mode();
   }
@@ -508,7 +508,7 @@ void open_valve(){
     int valve_close_angle = 0;
     int valve_open_angle = 180;
     Serial.println("Servo valve opening");
-  
+
     for(int angle = valve_close_angle; angle <= valve_open_angle; angle +=1) {
       servo_valve.write(angle);
       delay(20);
@@ -523,7 +523,7 @@ void close_valve(){
     int valve_close_angle = 0;
     int valve_open_angle = 180;
     Serial.println("Servo valve closing");
-  
+
     for(int angle = valve_open_angle; angle >= valve_close_angle; angle -=1) {
       servo_valve.write(angle);
       delay(20);
@@ -769,5 +769,5 @@ void setup() {
   }
   handle_timeout_comOK();
   Serial.println("going to sleep");
-  ESP.deepSleep(TIME_TO_SLEEP * uS_TO_S_FACTOR);
+  ESP.deepSleep(TIME_TO_SLEEP * uS_TO_min_FACTOR);
 }
